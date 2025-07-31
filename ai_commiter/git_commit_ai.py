@@ -10,6 +10,7 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import re
 from collections import defaultdict
+from ai_commiter import __version__
 
 def get_git_diff(repo_path='.', staged=True):
     """
@@ -299,6 +300,8 @@ def main():
     
     # 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI를 활용한 Git 커밋 메시지 생성기')
+    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}',
+                        help='버전 정보 표시')
     parser.add_argument('--repo', default='.', help='Git 저장소 경로 (기본값: 현재 디렉토리)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='스테이지된 변경사항 대신 모든 변경사항 포함')
