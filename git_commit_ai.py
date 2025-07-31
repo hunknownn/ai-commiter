@@ -7,8 +7,9 @@ import git
 import argparse
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+import re
+from collections import defaultdict
 
 def get_git_diff(repo_path='.', staged=True):
     """
@@ -48,7 +49,92 @@ def get_git_diff(repo_path='.', staged=True):
         print(f"Git diff 가져오기 오류: {str(e)}")
         sys.exit(1)
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo"):
+def categorize_file_changes(changed_files, diff):
+    """
+    변경된 파일들을 카테고리별로 분류합니다.
+    
+    Args:
+        changed_files (list): 변경된 파일 목록
+        diff (str): Git diff 내용
+    
+    Returns:
+        dict: 카테고리별로 분류된 파일 변경 정보
+    """
+    categories = {
+        'frontend': [],
+        'backend': [],
+        'config': [],
+        'docs': [],
+        'tests': [],
+        'assets': [],
+        'other': []
+    }
+    
+    # 파일 확장자 및 경로 기반 분류
+    file_patterns = {
+        'frontend': ['.html', '.css', '.js', '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.scss', '.sass', '.less'],
+        'backend': ['.py', '.java', '.go', '.rs', '.cpp', '.c', '.php', '.rb', '.cs', '.kt', '.scala'],
+        'config': ['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config', 'Dockerfile', 'docker-compose', '.env'],
+        'docs': ['.md', '.rst', '.txt', '.doc', '.docx', '.pdf'],
+        'tests': ['test_', '_test.', '.test.', 'spec_', '_spec.', '.spec.'],
+        'assets': ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot']
+    }
+    
+    # 변경 유형 분석 (추가, 수정, 삭제)
+    change_types = defaultdict(list)
+    
+    for file_path in changed_files:
+        categorized = False
+        file_lower = file_path.lower()
+        
+        # 테스트 파일 우선 확인
+        for test_pattern in file_patterns['tests']:
+            if test_pattern in file_lower:
+                categories['tests'].append(file_path)
+                categorized = True
+                break
+        
+        if not categorized:
+            # 다른 카테고리 확인
+            for category, patterns in file_patterns.items():
+                if category == 'tests':  # 이미 확인했으므로 스킵
+                    continue
+                    
+                for pattern in patterns:
+                    if file_lower.endswith(pattern) or pattern in file_lower:
+                        categories[category].append(file_path)
+                        categorized = True
+                        break
+                
+                if categorized:
+                    break
+        
+        if not categorized:
+            categories['other'].append(file_path)
+    
+    # diff에서 변경 유형 분석
+    diff_lines = diff.split('\n')
+    added_lines = len([line for line in diff_lines if line.startswith('+') and not line.startswith('+++')])
+    removed_lines = len([line for line in diff_lines if line.startswith('-') and not line.startswith('---')])
+    
+    # 새 파일과 삭제된 파일 감지
+    new_files = re.findall(r'new file mode \d+\n\+\+\+ b/(.+)', diff)
+    deleted_files = re.findall(r'deleted file mode \d+\n--- a/(.+)', diff)
+    
+    change_summary = {
+        'categories': {k: v for k, v in categories.items() if v},  # 빈 카테고리 제거
+        'stats': {
+            'total_files': len(changed_files),
+            'added_lines': added_lines,
+            'removed_lines': removed_lines,
+            'new_files': new_files,
+            'deleted_files': deleted_files
+        }
+    }
+    
+    return change_summary
+
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -57,6 +143,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         files (list): 변경된 파일 목록
         prompt_template (str, optional): 커스텀 프롬프트 템플릿
         openai_model (str, optional): 사용할 OpenAI 모델
+        enable_categorization (bool, optional): 파일 분류 기능 사용 여부
     
     Returns:
         str: 생성된 커밋 메시지
@@ -67,48 +154,107 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         print("오류: OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
         sys.exit(1)
     
+    # 파일 변경 내용 분류 (여러 파일이 변경된 경우)
+    change_summary = None
+    if enable_categorization and len(files) > 1:
+        change_summary = categorize_file_changes(files, diff)
+    
     # 기본 프롬프트 템플릿 설정
     if prompt_template is None:
-        prompt_template = """
-        다음은 Git 저장소의 변경 내용입니다. 이 변경 내용을 바탕으로 간결하고 명확한 커밋 메시지를 작성해 주세요.
-        커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
-        - 첫 줄: 변경의 요약 (타입: 내용) - 영어로 작성
-        - 두 번째 줄: 비움
-        - 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
-        
-        타입은 다음 중 하나를 사용하세요:
-        - feat: 새로운 기능 추가
-        - fix: 버그 수정
-        - docs: 문서 변경
-        - style: 코드 형식 변경 (코드 작동에 영향을 주지 않는 변경)
-        - refactor: 코드 리팩토링
-        - test: 테스트 코드 추가 또는 수정
-        - chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
-        
-        변경된 파일:
-        {files}
-        
-        변경 내용 (diff):
-        {diff}
-        
-        커밋 메시지만 출력해주세요:
-        """
+        if change_summary and len(files) > 1:
+            # 여러 파일 변경 시 카테고리별 분류 정보를 포함한 프롬프트
+            prompt_template = """
+다음은 Git 저장소의 변경 내용입니다. 여러 파일이 변경되었으므로 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
+
+커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
+- 첫 줄: 변경의 요약 (타입: 내용) - 영어로 작성
+- 두 번째 줄: 비움
+- 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
+
+타입은 다음 중 하나를 사용하세요:
+- feat: 새로운 기능 추가
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 코드 형식 변경
+- refactor: 코드 리팩토링
+- test: 테스트 코드 추가 또는 수정
+- chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
+
+변경 통계:
+- 총 파일 수: {total_files}개
+- 추가된 라인: {added_lines}줄
+- 삭제된 라인: {removed_lines}줄
+{new_files_info}{deleted_files_info}
+카테고리별 변경된 파일:
+{categorized_files}
+
+변경 내용 (diff):
+{diff}
+
+커밋 메시지만 출력해주세요:
+"""
+        else:
+            # 단일 파일 또는 분류 비활성화 시 기본 프롬프트
+            prompt_template = """
+다음은 Git 저장소의 변경 내용입니다. 이 변경 내용을 바탕으로 간결하고 명확한 커밋 메시지를 작성해 주세요.
+커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
+- 첫 줄: 변경의 요약 (타입: 내용) - 영어로 작성
+- 두 번째 줄: 비움
+- 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
+
+타입은 다음 중 하나를 사용하세요:
+- feat: 새로운 기능 추가
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 코드 형식 변경 (코드 작동에 영향을 주지 않는 변경)
+- refactor: 코드 리팩토링
+- test: 테스트 코드 추가 또는 수정
+- chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
+
+변경된 파일:
+{files}
+
+변경 내용 (diff):
+{diff}
+
+커밋 메시지만 출력해주세요:
+"""
     
-    # LangChain 설정
+    # 프롬프트 변수 준비
+    prompt_vars = {"diff": diff, "files": "\n".join(files)}
+    
+    # 카테고리 정보가 있는 경우 추가 변수 설정
+    if change_summary:
+        stats = change_summary['stats']
+        prompt_vars.update({
+            "total_files": stats['total_files'],
+            "added_lines": stats['added_lines'],
+            "removed_lines": stats['removed_lines'],
+            "new_files_info": f"\n- 새 파일: {len(stats['new_files'])}개" if stats['new_files'] else "",
+            "deleted_files_info": f"\n- 삭제된 파일: {len(stats['deleted_files'])}개" if stats['deleted_files'] else "",
+            "categorized_files": "\n".join([f"- {category.title()}: {', '.join(files)}" 
+                                           for category, files in change_summary['categories'].items()])
+        })
+        
+        # 카테고리별 프롬프트용 변수명 설정
+        input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
+                          "new_files_info", "deleted_files_info", "categorized_files"]
+    else:
+        input_variables = ["diff", "files"]
+    
+    # LangChain 설정 (새로운 RunnableSequence 방식)
     llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
-    chain_prompt = PromptTemplate(input_variables=["diff", "files"], template=prompt_template)
-    chain = LLMChain(llm=llm, prompt=chain_prompt)
-    
-    # 파일 목록을 문자열로 변환
-    files_str = "\n".join(files)
+    chain_prompt = PromptTemplate(input_variables=input_variables, template=prompt_template)
+    chain = chain_prompt | llm
     
     # 너무 큰 diff는 잘라내기 (토큰 한도 고려)
-    if len(diff) > 4000:
-        diff = diff[:4000] + "\n... (생략됨)"
+    if len(prompt_vars["diff"]) > 4000:
+        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (생략됨)"
     
     # 커밋 메시지 생성
-    result = chain.invoke({"diff": diff, "files": files_str})
-    commit_message = result["text"] if isinstance(result, dict) and "text" in result else result
+    result = chain.invoke(prompt_vars)
+    # AIMessage 객체에서 content 속성 추출
+    commit_message = result.content if hasattr(result, 'content') else str(result)
     return commit_message.strip()
 
 def make_commit(repo_path='.', message=None):
@@ -140,6 +286,7 @@ def main():
     parser.add_argument('--model', default='gpt-3.5-turbo', help='사용할 OpenAI 모델')
     parser.add_argument('--commit', action='store_true', help='자동으로 커밋 수행')
     parser.add_argument('--prompt', help='커스텀 프롬프트 템플릿 파일 경로')
+    parser.add_argument('--no-categorize', action='store_true', help='파일 분류 기능 비활성화')
     
     args = parser.parse_args()
     
@@ -162,7 +309,20 @@ def main():
     
     # 커밋 메시지 생성
     print("🤖 AI가 커밋 메시지를 생성 중입니다...")
-    commit_message = generate_commit_message(diff, changed_files, custom_prompt, args.model)
+    
+    # 파일 분류 정보 출력 (여러 파일 변경 시)
+    if len(changed_files) > 1 and not args.no_categorize:
+        change_summary = categorize_file_changes(changed_files, diff)
+        print(f"\n📊 변경 통계: {change_summary['stats']['total_files']}개 파일, "
+              f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} 라인")
+        
+        if change_summary['categories']:
+            print("📁 카테고리별 변경:")
+            for category, files in change_summary['categories'].items():
+                print(f"  - {category.title()}: {', '.join(files)}")
+    
+    commit_message = generate_commit_message(diff, changed_files, custom_prompt, args.model, 
+                                           enable_categorization=not args.no_categorize)
     
     print("\n📝 생성된 커밋 메시지:")
     print("-" * 50)
