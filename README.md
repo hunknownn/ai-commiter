@@ -56,6 +56,28 @@ export OPENAI_API_KEY=your-api-key-here
 # set OPENAI_API_KEY=your-api-key-here
 ```
 
+## 업그레이드
+
+새 버전이 출시되면 다음 명령어를 사용하여 업그레이드할 수 있습니다:
+
+### pipx로 설치한 경우
+
+```bash
+pipx upgrade ai-commiter
+```
+
+### pip로 설치한 경우
+
+```bash
+pip install --upgrade ai-commiter
+```
+
+현재 설치된 버전을 확인하려면:
+
+```bash
+ai-commit --version
+```
+
 ### 저장소에서 직접 설치
 
 ```bash
