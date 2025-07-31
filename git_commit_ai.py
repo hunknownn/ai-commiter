@@ -6,7 +6,7 @@ import sys
 import git
 import argparse
 from dotenv import load_dotenv
-from langchain.llms import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
@@ -95,7 +95,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         """
     
     # LangChain 설정
-    llm = OpenAI(temperature=0.5, model_name=openai_model)
+    llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
     chain_prompt = PromptTemplate(input_variables=["diff", "files"], template=prompt_template)
     chain = LLMChain(llm=llm, prompt=chain_prompt)
     
@@ -107,7 +107,8 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         diff = diff[:4000] + "\n... (생략됨)"
     
     # 커밋 메시지 생성
-    commit_message = chain.run(diff=diff, files=files_str)
+    result = chain.invoke({"diff": diff, "files": files_str})
+    commit_message = result["text"] if isinstance(result, dict) and "text" in result else result
     return commit_message.strip()
 
 def make_commit(repo_path='.', message=None):
