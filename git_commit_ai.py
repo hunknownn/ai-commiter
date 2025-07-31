@@ -10,6 +10,7 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import re
 from collections import defaultdict
+from ai_commiter import __version__
 
 def get_git_diff(repo_path='.', staged=True):
     """
@@ -118,21 +119,40 @@ def categorize_file_changes(changed_files, diff):
     removed_lines = len([line for line in diff_lines if line.startswith('-') and not line.startswith('---')])
     
     # 새 파일과 삭제된 파일 감지
-    new_files = re.findall(r'new file mode \d+\n\+\+\+ b/(.+)', diff)
-    deleted_files = re.findall(r'deleted file mode \d+\n--- a/(.+)', diff)
+    file_status = {}
+    new_files = []
+    deleted_files = []
+    for line in diff_lines:
+        if line.startswith('diff --git'):
+            parts = line.split(' ')
+            if len(parts) >= 3:
+                file_path = parts[2][2:]  # remove 'a/'
+                file_status[file_path] = 'modified'
+        elif line.startswith('new file mode'):
+            new_files.append(file_path)
+            file_status[file_path] = 'added'
+        elif line.startswith('deleted file mode'):
+            deleted_files.append(file_path)
+            file_status[file_path] = 'deleted'
     
-    change_summary = {
-        'categories': {k: v for k, v in categories.items() if v},  # 빈 카테고리 제거
+    # 분류 정보 구성
+    result = {
+        'categories': {},
         'stats': {
             'total_files': len(changed_files),
             'added_lines': added_lines,
             'removed_lines': removed_lines,
-            'new_files': new_files,
-            'deleted_files': deleted_files
+            'new_files': len(new_files),
+            'deleted_files': len(deleted_files)
         }
     }
     
-    return change_summary
+    # 각 카테고리에 파일이 있는 경우만 결과에 포함
+    for category, files in categories.items():
+        if files:
+            result['categories'][category] = files
+    
+    return result
 
 def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True):
     """
@@ -280,6 +300,8 @@ def main():
     
     # 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI를 활용한 Git 커밋 메시지 생성기')
+    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}',
+                        help='버전 정보 표시')
     parser.add_argument('--repo', default='.', help='Git 저장소 경로 (기본값: 현재 디렉토리)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='스테이지된 변경사항 대신 모든 변경사항 포함')
@@ -337,6 +359,10 @@ def main():
     else:
         print("\n커밋하려면 다음 명령을 실행하세요:")
         print(f"git commit -m \"{commit_message}\"")
+
+def cli():
+    """패키지의 명령줄 진입점"""
+    main()
 
 if __name__ == "__main__":
     main()
