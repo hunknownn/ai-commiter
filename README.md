@@ -78,4 +78,4 @@ python git_commit_ai.py --prompt my_custom_prompt.txt
 
 ## 라이센스
 
-MIT
+MIT## 테스트 변경사항
