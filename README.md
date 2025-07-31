@@ -15,15 +15,44 @@
 
 ## 설치 방법
 
-### PyPI 패키지로 설치 (권장)
+### pipx로 설치 (권장)
+
+[pipx](https://pypa.github.io/pipx/)는 애플리케이션을 격리된 환경에 설치하여 의존성 충돌 없이 사용할 수 있게 해줍니다.
 
 ```bash
-# PyPI에서 패키지 설치
+# 1. pipx 설치 (처음 사용시)
+pip install pipx
+pipx ensurepath
+
+# 2. 환경 변수 적용 (하나를 선택)
+# macOS 사용자 (기본 zsh)
+source ~/.zshrc
+# Linux 또는 기타 bash 사용자
+source ~/.bashrc
+
+# 3. ai-commiter 설치
+pipx install ai-commiter
+
+# 4. OpenAI API 키 설정
+# macOS/Linux
+export OPENAI_API_KEY=your-api-key-here
+# Windows
+# set OPENAI_API_KEY=your-api-key-here
+```
+
+> **문제해결**: 설치 후 `ai-commit` 명령어를 찾을 수 없는 경우:
+> 1. `pipx ensurepath` 실행
+> 2. `source ~/.zshrc` (macOS) 또는 `source ~/.bashrc` (Linux) 실행
+> 3. 새로운 터미널을 열어 시도
+
+### pip로 설치
+
+```bash
 pip install ai-commiter
 
 # OpenAI API 키 설정
 export OPENAI_API_KEY=your-api-key-here
-# Windows에서는 
+# Windows에서는
 # set OPENAI_API_KEY=your-api-key-here
 ```
 
