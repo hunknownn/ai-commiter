@@ -2,6 +2,8 @@
 
 인공지능을 활용하여 Git 커밋 메시지를 자동으로 생성하는 도구입니다. 파일 변경 내역을 분석하고 OpenAI API를 통해 명확하고 구조화된 커밋 메시지를 생성합니다.
 
+[![PyPI version](https://badge.fury.io/py/ai-commiter.svg)](https://badge.fury.io/py/ai-commiter)
+
 ## 주요 기능
 
 - **자동 커밋 메시지 생성**: Git diff를 분석하여 의미 있는 커밋 메시지 생성
@@ -13,13 +15,27 @@
 
 ## 설치 방법
 
+### PyPI 패키지로 설치 (권장)
+
+```bash
+# PyPI에서 패키지 설치
+pip install ai-commiter
+
+# OpenAI API 키 설정
+export OPENAI_API_KEY=your-api-key-here
+# Windows에서는 
+# set OPENAI_API_KEY=your-api-key-here
+```
+
+### 저장소에서 직접 설치
+
 ```bash
 # 저장소 클론
 git clone https://github.com/your-username/ai-commiter.git
 cd ai-commiter
 
-# 의존성 설치
-pip install -r requirements.txt
+# 패키지로 설치
+pip install -e .
 
 # OpenAI API 키 설정
 echo "OPENAI_API_KEY=your-api-key-here" > .env
@@ -31,29 +47,32 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 
 ```bash
 # 스테이지된 변경 사항에 대한 커밋 메시지 생성
-python git_commit_ai.py
+ai-commit
 
 # 생성된 메시지로 바로 커밋
-python git_commit_ai.py --commit
+ai-commit --commit
+
+# 패키지 설치 없이 직접 실행할 경우
+python -m ai_commiter.git_commit_ai
 ```
 
 ### 추가 옵션
 
 ```bash
 # 특정 저장소 경로 지정
-python git_commit_ai.py --repo /path/to/repo --model gpt-4 --commit
+ai-commit --repo /path/to/repo --model gpt-4 --commit
 
 # 파일 분류 기능 비활성화
-python git_commit_ai.py --no-categorize
+ai-commit --no-categorize
 
 # 스테이지되지 않은 모든 변경 사항 포함
-python git_commit_ai.py --all
+ai-commit --all
 
 # 다른 OpenAI 모델 사용
-python git_commit_ai.py --model gpt-4
+ai-commit --model gpt-4
 
 # 커스텀 프롬프트 템플릿 사용
-python git_commit_ai.py --prompt my_custom_prompt.txt
+ai-commit --prompt my_custom_prompt.txt
 ```
 
 ## 커스텀 프롬프트 템플릿
@@ -75,4 +94,4 @@ python git_commit_ai.py --prompt my_custom_prompt.txt
 
 ## 라이센스
 
-MIT## 테스트 변경사항
+MIT
