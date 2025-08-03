@@ -181,16 +181,14 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     if not os.getenv("OPENAI_API_KEY") and api_key:
         os.environ["OPENAI_API_KEY"] = api_key
     
-    # 파일 변경 내용 분류 (여러 파일이 변경된 경우)
+    # 파일 변경 내용 분류
     change_summary = None
-    if enable_categorization and len(files) > 1:
+    if enable_categorization:
         change_summary = categorize_file_changes(files, diff)
     
     # 기본 프롬프트 템플릿 설정
     if prompt_template is None:
-        if change_summary and len(files) > 1:
-            # 여러 파일 변경 시 카테고리별 분류 정보를 포함한 프롬프트
-            prompt_template = """
+        prompt_template = """
 다음은 Git 저장소의 변경 내용입니다. 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
 변경사항을 분석 후, 핵심내용을 파악하여 1가지의 타입을 사용해주세요.
 
@@ -214,48 +212,6 @@ refactor: 코드 리팩토링
 test: 테스트 코드 추가 또는 수정
 chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
 
-변경 통계:
-- 총 파일 수: {total_files}개
-- 추가된 라인: {added_lines}줄
-- 삭제된 라인: {removed_lines}줄
-{new_files_info}{deleted_files_info}
-카테고리별 변경된 파일:
-{categorized_files}
-
-변경 내용 (diff):
-{diff}
-
-커밋 메시지만 출력해주세요:
-"""
-        else:
-            # 단일 파일 또는 분류 비활성화 시 기본 프롬프트
-            prompt_template = """
-다음은 Git 저장소의 변경 내용입니다. 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
-변경사항을 분석 후, 핵심내용을 파악하여 1가지의 타입을 사용해주세요.
-
-커밋 메시지는 header, body로 구성됩니다.
-각 구성은 다음의 규칙을 따릅니다.
-1. header
-- '타입: 내용' 의 형태로 작성
-- 내용은 변경사항에 대한 간략한 요약으로, 50자 이내로 작성
-
-2. body
-- 변경 사항에 대한 상세 설명으로, 한 줄당 72자 이내로 작성
-- 어떻게 변경했는지보다 무엇을, 왜 변경했는지에 대한 설명을 작성
-- 필요에 따라 변경 사항을 여러 줄에 걸쳐 설명
-
-타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
-feat: 새로운 기능 추가
-fix: 버그 수정
-docs: 문서 변경
-style: 코드 형식 변경 (코드 작동에 영향을 주지 않는 변경)
-refactor: 코드 리팩토링
-test: 테스트 코드 추가 또는 수정
-chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
-
-변경된 파일:
-{files}
-
 변경 내용 (diff):
 {diff}
 
@@ -263,7 +219,7 @@ chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
 """
     
     # 프롬프트 변수 준비
-    prompt_vars = {"diff": diff, "files": "\n".join(files)}
+    prompt_vars = {"diff": diff}
     
     # 카테고리 정보가 있는 경우 추가 변수 설정
     if change_summary:
@@ -282,7 +238,17 @@ chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
                           "new_files_info", "deleted_files_info", "categorized_files"]
     else:
-        input_variables = ["diff", "files"]
+        # 분류 정보가 없는 경우 기본값 설정
+        prompt_vars.update({
+            "total_files": len(files),
+            "added_lines": "알 수 없음",
+            "removed_lines": "알 수 없음",
+            "new_files_info": "",
+            "deleted_files_info": "",
+            "categorized_files": "분류되지 않음"
+        })
+        input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
+                          "new_files_info", "deleted_files_info", "categorized_files"]
     
     # LangChain 설정 (새로운 RunnableSequence 방식)
     llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
