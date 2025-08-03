@@ -12,6 +12,67 @@ import re
 from collections import defaultdict
 from ai_commiter import __version__
 
+# Language pack definitions
+LANGUAGE_PACKS = {
+    'ko': {
+        'name': 'Korean',
+        'response_instruction': 'Please respond in Korean. The title should be in English (imperative mood), but the detailed description should be in Korean.'
+    },
+    'en': {
+        'name': 'English', 
+        'response_instruction': 'Please respond in English. Use imperative mood for the title and provide detailed description in English.'
+    },
+    'ja': {
+        'name': 'Japanese',
+        'response_instruction': 'Please respond in Japanese. The title should be in English (imperative mood), but the detailed description should be in Japanese.'
+    },
+    'zh': {
+        'name': 'Chinese',
+        'response_instruction': 'Please respond in Chinese. The title should be in English (imperative mood), but the detailed description should be in Chinese.'
+    }
+}
+
+# Unified English prompt template
+COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes. Refer to the categorized information to write a concise and clear commit message.
+After analyzing the changes, identify the core content and use only one type.
+
+The commit message consists of header and body.
+Each component follows these rules:
+1. header
+- Written in the format 'type: content'
+- Content is a brief summary of changes, written within 50 characters
+
+2. body
+- Detailed description of changes, written within 72 characters per line
+- Describe what and why changed rather than how it was changed
+- Explain changes across multiple lines as needed
+
+Select only one type from the following (even if there are multiple changes, select only the most important change type):
+feat: Add new feature
+fix: Fix bug
+docs: Change documentation
+style: Change code formatting
+refactor: Code refactoring
+test: Add or modify test code
+chore: Change build process or auxiliary tools and libraries
+
+Change statistics:
+- Total {total_files} files changed
+- {added_lines} lines added, {removed_lines} lines deleted
+
+{categorized_files}
+
+Changes (diff):
+{diff}
+
+{language_instruction}
+
+Output only the commit message:'''
+
+def get_language_instruction(lang):
+    """Get language-specific response instruction."""
+    return LANGUAGE_PACKS.get(lang, LANGUAGE_PACKS['ko'])['response_instruction']
+
 def get_git_diff(repo_path='.', staged=True):
     """
     Git 저장소에서 변경 내용을 가져옵니다.
@@ -44,10 +105,39 @@ def get_git_diff(repo_path='.', staged=True):
         
         return diff, [f for f in changed_files if f]
     except git.exc.InvalidGitRepositoryError:
-        print(f"오류: '{repo_path}'는 유효한 Git 저장소가 아닙니다.")
+        print(f"Error: '{repo_path}' is not a valid Git repository.")
         sys.exit(1)
     except Exception as e:
-        print(f"Git diff 가져오기 오류: {str(e)}")
+        print(f"Git diff error: {str(e)}")
+        return diff
+
+def get_changed_files(repo_path='.', staged=True):
+    """
+    변경된 파일 목록을 가져옵니다.
+    
+    Args:
+        repo_path (str): Git 저장소 경로
+        staged (bool): True면 스테이지된 변경사항, False면 모든 변경사항
+    
+    Returns:
+        list: 변경된 파일 목록
+    """
+    try:
+        repo = git.Repo(repo_path)
+        
+        if staged:
+            # 스테이지된 변경사항만 가져오기
+            changed_files = repo.git.diff('--cached', '--name-only').split('\n')
+        else:
+            # 모든 변경사항 가져오기
+            changed_files = repo.git.diff('--name-only').split('\n')
+        
+        return [f for f in changed_files if f]
+    except git.exc.InvalidGitRepositoryError:
+        print(f"Error: '{repo_path}' is not a valid Git repository.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error getting changed files: {str(e)}")
         sys.exit(1)
 
 def categorize_file_changes(changed_files, diff):
@@ -170,30 +260,30 @@ def get_recommended_model(files, diff):
     # 파일 수에 따른 점수
     if file_count > 10:
         complexity_score += 3
-        score_details.append(f"파일 수 {file_count}개 (+3)")
+        score_details.append(f"{file_count} files (+3)")
     elif file_count > 5:
         complexity_score += 2
-        score_details.append(f"파일 수 {file_count}개 (+2)")
+        score_details.append(f"{file_count} files (+2)")
     elif file_count > 1:
         complexity_score += 1
-        score_details.append(f"파일 수 {file_count}개 (+1)")
+        score_details.append(f"{file_count} files (+1)")
     else:
-        score_details.append(f"파일 수 {file_count}개 (+0)")
+        score_details.append(f"{file_count} files (+0)")
     
     # diff 크기에 따른 점수
     if diff_lines > 1000:
         complexity_score += 3
-        score_details.append(f"diff {diff_lines}줄 (+3)")
+        score_details.append(f"{diff_lines} diff lines (+3)")
     elif diff_lines > 500:
         complexity_score += 2
-        score_details.append(f"diff {diff_lines}줄 (+2)")
+        score_details.append(f"{diff_lines} diff lines (+2)")
     elif diff_lines > 100:
         complexity_score += 1
-        score_details.append(f"diff {diff_lines}줄 (+1)")
+        score_details.append(f"{diff_lines} diff lines (+1)")
     else:
-        score_details.append(f"diff {diff_lines}줄 (+0)")
+        score_details.append(f"{diff_lines} diff lines (+0)")
         
-    # 점수에 따른 모델 선택 (4점 이상에서 GPT-4.1 사용)
+    # 점수에 따른 모델 선택 (3점 이상에서 GPT-4.1 사용)
     if complexity_score >= 4:
         selected_model = "gpt-4.1"
         reason = "복잡한 변경사항"
@@ -203,7 +293,7 @@ def get_recommended_model(files, diff):
     
     return selected_model, complexity_score, score_details, reason
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True):
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True, lang='ko'):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -213,6 +303,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         prompt_template (str, optional): 커스텀 프롬프트 템플릿
         openai_model (str, optional): 사용할 OpenAI 모델
         enable_categorization (bool, optional): 파일 분류 기능 사용 여부
+        lang (str, optional): 응답 언어 코드
     
     Returns:
         str: 생성된 커밋 메시지
@@ -221,83 +312,59 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     # AI_COMMITER_API_KEY를 우선 확인하고, 없으면 OPENAI_API_KEY 확인
     api_key = os.getenv("AI_COMMITER_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("오류: API 키가 설정되지 않았습니다.")
-        print("AI_COMMITER_API_KEY 또는 OPENAI_API_KEY 환경 변수를 설정해주세요.")
-        print("예: export AI_COMMITER_API_KEY=your-api-key-here")
+        print("Error: OpenAI API key is not set.")
+        print("Please set AI_COMMITER_API_KEY or OPENAI_API_KEY environment variable.")
+        print("Example: export AI_COMMITER_API_KEY=your-api-key-here")
         sys.exit(1)
     
     # OPENAI_API_KEY 환경 변수가 없는 경우, 임시로 설정 (라이브러리가 확인하는 변수명)
     if not os.getenv("OPENAI_API_KEY") and api_key:
         os.environ["OPENAI_API_KEY"] = api_key
     
-    # 파일 변경 내용 분류
+    # 파일 변경 내용 분류 (여러 파일이 변경된 경우)
     change_summary = None
     if enable_categorization:
         change_summary = categorize_file_changes(files, diff)
     
-    # 기본 프롬프트 템플릿 설정
+    # 기본 프롬프트 템플릿 설정 (새로운 언어팩 시스템 사용)
     if prompt_template is None:
-        prompt_template = """
-다음은 Git 저장소의 변경 내용입니다. 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
-변경사항을 분석 후, 핵심내용을 파악하여 1가지의 타입을 사용해주세요.
-
-커밋 메시지는 header, body로 구성됩니다.
-각 구성은 다음의 규칙을 따릅니다.
-1. header
-- '타입: 내용' 의 형태로 작성
-- 내용은 변경사항에 대한 간략한 요약으로, 50자 이내로 작성
-
-2. body
-- 변경 사항에 대한 상세 설명으로, 한 줄당 72자 이내로 작성
-- 어떻게 변경했는지보다 무엇을, 왜 변경했는지에 대한 설명을 작성
-- 필요에 따라 변경 사항을 여러 줄에 걸쳐 설명
-
-타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
-feat: 새로운 기능 추가
-fix: 버그 수정
-docs: 문서 변경
-style: 코드 형식 변경
-refactor: 코드 리팩토링
-test: 테스트 코드 추가 또는 수정
-chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
-
-변경 내용 (diff):
-{diff}
-
-커밋 메시지만 출력해주세요:
-"""
+        prompt_template = COMMIT_PROMPT_TEMPLATE
     
     # 프롬프트 변수 준비
-    prompt_vars = {"diff": diff}
+    prompt_vars = {
+        "diff": diff,
+        "language_instruction": get_language_instruction(lang)
+    }
     
     # 카테고리 정보가 있는 경우 추가 변수 설정
     if change_summary:
         stats = change_summary['stats']
+        # 카테고리별 파일 목록 영어로 포맷팅
+        categorized_files_str = "\n".join([
+            f"- {category.title()}: {', '.join(files)}" 
+            for category, files in change_summary['categories'].items() if files
+        ])
+        
         prompt_vars.update({
             "total_files": stats['total_files'],
             "added_lines": stats['added_lines'],
             "removed_lines": stats['removed_lines'],
-            "new_files_info": f"\n- 새 파일: {len(stats['new_files'])}개" if stats['new_files'] else "",
-            "deleted_files_info": f"\n- 삭제된 파일: {len(stats['deleted_files'])}개" if stats['deleted_files'] else "",
-            "categorized_files": "\n".join([f"- {category.title()}: {', '.join(files)}" 
-                                           for category, files in change_summary['categories'].items()])
+            "categorized_files": categorized_files_str if categorized_files_str else "No categorized files"
         })
         
         # 카테고리별 프롬프트용 변수명 설정
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
-                          "new_files_info", "deleted_files_info", "categorized_files"]
+                          "categorized_files", "language_instruction"]
     else:
         # 분류 정보가 없는 경우 기본값 설정
         prompt_vars.update({
             "total_files": len(files),
-            "added_lines": "알 수 없음",
-            "removed_lines": "알 수 없음",
-            "new_files_info": "",
-            "deleted_files_info": "",
-            "categorized_files": "분류되지 않음"
+            "added_lines": "Unknown",
+            "removed_lines": "Unknown",
+            "categorized_files": "No categorization"
         })
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
-                          "new_files_info", "deleted_files_info", "categorized_files"]
+                          "categorized_files", "language_instruction"]
     
     # LangChain 설정 (새로운 RunnableSequence 방식)
     llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
@@ -306,7 +373,7 @@ chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
     
     # 너무 큰 diff는 잘라내기 (토큰 한도 고려)
     if len(prompt_vars["diff"]) > 4000:
-        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (생략됨)"
+        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (truncated)"
     
     # 커밋 메시지 생성
     result = chain.invoke(prompt_vars)
@@ -325,10 +392,10 @@ def make_commit(repo_path='.', message=None):
     try:
         repo = git.Repo(repo_path)
         repo.git.commit('-m', message)
-        print(f"✅ 성공적으로 커밋했습니다: '{message}'")
+        print(f"✅ Successfully committed: '{message}'")
         return True
     except Exception as e:
-        print(f"커밋 오류: {str(e)}")
+        print(f"Commit error: {str(e)}")
         return False
 
 def main():
@@ -347,6 +414,8 @@ def main():
     parser.add_argument('--commit', action='store_true', help='자동으로 커밋 수행')
     parser.add_argument('--prompt', help='커스텀 프롬프트 템플릿 파일 경로')
     parser.add_argument('--no-categorize', action='store_true', help='파일 분류 기능 비활성화')
+    parser.add_argument('--lang', choices=['ko', 'en', 'ja', 'zh'], default='ko',
+                        help='커밋 메시지 언어 (ko: 한국어, en: 영어, ja: 일본어, zh: 중국어)')
     
     args = parser.parse_args()
     
@@ -357,61 +426,68 @@ def main():
             with open(args.prompt, 'r', encoding='utf-8') as f:
                 custom_prompt = f.read()
         except Exception as e:
-            print(f"프롬프트 파일 로드 오류: {str(e)}")
+            print(f"Prompt file load error: {str(e)}")
             sys.exit(1)
     
     # Git diff 가져오기
-    diff, changed_files = get_git_diff(args.repo, args.staged)
+    try:
+        diff = get_git_diff(args.repo, staged=args.staged)
+        changed_files = get_changed_files(args.repo, staged=args.staged)
+    except Exception as e:
+        print(f"Git diff error: {str(e)}")
+        sys.exit(1)
     
-    if diff is None or not changed_files:
-        print("변경된 내용이 없습니다.")
+    # 변경사항이 없는 경우
+    if not diff.strip():
+        print("No changes found.")
         sys.exit(0)
     
-    # 모델 선택 (기본: 자동 선택)
+    # 모델 선택
     if args.model:
         # 수동으로 모델 지정된 경우
         selected_model = args.model
-        print(f"🎯 수동 선택: {selected_model} 모델 사용")
+        print(f"🎯 Manual selection: Using {selected_model} model")
     elif args.no_auto_model:
         # 자동 선택 비활성화
         selected_model = "gpt-3.5-turbo"
-        print(f"🔄 기본 모델: {selected_model} 사용")
+        print(f"🔄 Default model: Using {selected_model}")
     else:
         # 자동 모델 선택 (기본값)
         selected_model, score, details, reason = get_recommended_model(changed_files, diff)
-        print(f"🧠 복잡도 분석: {reason} (점수: {score})")
+        reason_en = "Complex changes" if reason == "복잡한 변경사항" else "Simple changes"
+        print(f"🧠 Complexity analysis: {reason_en} (score: {score})")
         print(f"   • {', '.join(details)}")
-        print(f"   → {selected_model} 모델 선택")
+        print(f"   → Selected {selected_model} model")
     
     # 커밋 메시지 생성
-    print("🤖 AI가 커밋 메시지를 생성 중입니다...")
+    print("🤖 AI is generating commit message...")
     
     # 파일 분류 정보 출력 (여러 파일 변경 시)
     if len(changed_files) > 1 and not args.no_categorize:
         change_summary = categorize_file_changes(changed_files, diff)
-        print(f"\n📊 변경 통계: {change_summary['stats']['total_files']}개 파일, "
-              f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} 라인")
+        print(f"\n📊 Change statistics: {change_summary['stats']['total_files']} files, "
+              f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} lines")
         
         if change_summary['categories']:
-            print("📁 카테고리별 변경:")
+            print("📁 Changes by category:")
             for category, files in change_summary['categories'].items():
                 print(f"  - {category.title()}: {', '.join(files)}")
     
     commit_message = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
-                                           enable_categorization=not args.no_categorize)
+                                           enable_categorization=not args.no_categorize, lang=args.lang)
     
-    print("\n📝 생성된 커밋 메시지:")
+    print("\n📝 Generated commit message:")
     print("-" * 50)
     print(commit_message)
     print("-" * 50)
     
     # 자동 커밋 옵션이 활성화된 경우
     if args.commit:
-        confirm = input("\n이 메시지로 커밋하시겠습니까? (y/n): ")
+        confirm = input("\nDo you want to commit with this message? (y/n): ")
         if confirm.lower() == 'y':
             make_commit(args.repo, commit_message)
     else:
-        print("\n커밋하려면 다음 명령을 실행하세요:")
+        print("\nTo commit, run the following command:")
         print(f"git commit -m \"{commit_message}\"")
 
 def cli():
