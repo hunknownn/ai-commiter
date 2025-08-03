@@ -1,17 +1,20 @@
 # AI-Commiter
 
-인공지능을 활용하여 Git 커밋 메시지를 자동으로 생성하는 도구입니다. 파일 변경 내역을 분석하고 OpenAI API를 통해 명확하고 구조화된 커밋 메시지를 생성합니다.
+AI-powered Git commit message generator with multi-language support. Analyzes file changes and generates clear, structured commit messages using OpenAI API.
+
+인공지능을 활용한 다국어 지원 Git 커밋 메시지 생성기입니다. 파일 변경 내역을 분석하고 OpenAI API를 통해 명확하고 구조화된 커밋 메시지를 생성합니다.
 
 [![PyPI version](https://badge.fury.io/py/ai-commiter.svg)](https://badge.fury.io/py/ai-commiter)
 
-## 주요 기능
+## Key Features / 주요 기능
 
-- **자동 커밋 메시지 생성**: Git diff를 분석하여 의미 있는 커밋 메시지 생성
-- **Conventional Commits 지원**: 표준화된 커밋 메시지 형식 사용
-- **파일 분류 및 요약**: 여러 파일 변경 시 카테고리별로 분류하여 요약 정보 제공
-- **커스텀 프롬프트**: 사용자 정의 프롬프트 템플릿 지원
-- **자동 커밋**: 생성된 메시지로 자동 커밋 옵션
-- **다양한 모델 지원**: OpenAI의 다양한 GPT 모델 선택 가능
+- **🌍 Multi-language Support / 다국어 지원**: Generate commit messages in Korean, English, Japanese, Chinese (Simplified/Traditional)
+- **🤖 Automatic Commit Message Generation / 자동 커밋 메시지 생성**: Analyzes Git diff to create meaningful commit messages
+- **📝 Conventional Commits Support / Conventional Commits 지원**: Uses standardized commit message format
+- **📁 File Categorization & Summary / 파일 분류 및 요약**: Categorizes multiple file changes and provides summary information
+- **⚙️ Custom Prompts / 커스텀 프롬프트**: Support for user-defined prompt templates
+- **⚡ Auto Commit / 자동 커밋**: Option to automatically commit with generated message
+- **🧠 Multiple AI Models / 다양한 모델 지원**: Choose from various OpenAI GPT models with automatic complexity-based selection
 
 ## 설치 방법
 
@@ -136,34 +139,63 @@ ai-commit --commit
 python -m ai_commiter.git_commit_ai
 ```
 
-### 추가 옵션
+### Additional Options / 추가 옵션
 
 ```bash
-# 특정 저장소 경로 지정
+# Multi-language support / 다국어 지원
+ai-commit --lang ko          # Korean / 한국어
+ai-commit --lang en          # English / 영어
+ai-commit --lang ja          # Japanese / 일본어
+ai-commit --lang zh-CN       # Chinese Simplified / 중국어 간체
+ai-commit --lang zh-TW       # Chinese Traditional / 중국어 번체
+
+# Specify repository path / 특정 저장소 경로 지정
 ai-commit --repo /path/to/repo --model gpt-4 --commit
 
-# 파일 분류 기능 비활성화
+# Disable file categorization / 파일 분류 기능 비활성화
 ai-commit --no-categorize
 
-# 스테이지되지 않은 모든 변경 사항 포함
+# Include all unstaged changes / 스테이지되지 않은 모든 변경 사항 포함
 ai-commit --all
 
-# 다른 OpenAI 모델 사용
+# Use different OpenAI model / 다른 OpenAI 모델 사용
 ai-commit --model gpt-4
 
-# 커스텀 프롬프트 템플릿 사용
+# Use custom prompt template / 커스텀 프롬프트 템플릿 사용
 ai-commit --prompt my_custom_prompt.txt
+
+# Combined example / 조합 예시
+ai-commit --lang en --model gpt-4 --commit
 ```
 
-## 커스텀 프롬프트 템플릿
+## Supported Languages / 지원 언어
 
-커스텀 프롬프트 템플릿 파일을 만들어 AI가 생성하는 커밋 메시지의 스타일과 형식을 조정할 수 있습니다. 템플릿에는 `{diff}`와 `{files}` 변수를 사용할 수 있습니다.
+| Language | Code | Locale | Example |
+|----------|------|--------|---------|
+| Korean / 한국어 | `ko`, `ko-KR` | ko-KR | `ai-commit --lang ko` |
+| English / 영어 | `en`, `en-US`, `en-GB` | en-US, en-GB | `ai-commit --lang en` |
+| Japanese / 일본어 | `ja`, `ja-JP` | ja-JP | `ai-commit --lang ja` |
+| Chinese Simplified / 중국어 간체 | `zh`, `zh-CN` | zh-CN | `ai-commit --lang zh-CN` |
+| Chinese Traditional / 중국어 번체 | `zh-TW` | zh-TW | `ai-commit --lang zh-TW` |
 
-예시 템플릿:
+**Note**: Commit message titles are always generated in English (imperative mood) following Conventional Commits standard, while detailed descriptions are localized to the selected language.
+
+## Custom Prompt Templates / 커스텀 프롬프트 템플릿
+
+You can create custom prompt template files to adjust the style and format of AI-generated commit messages. Templates can use `{diff}`, `{language_instruction}`, and categorization variables.
+
+커스텀 프롬프트 템플릿 파일을 만들어 AI가 생성하는 커밋 메시지의 스타일과 형식을 조정할 수 있습니다.
+
+Example template / 예시 템플릿:
 
 ```
-다음 변경 사항을 분석하여 한국어로 커밋 메시지만 출력해주세요:
-커밋 메시지 형식: [타입] 내용
+Analyze the following changes and generate a commit message.
+Use conventional commit format: type: description
+
+Changes:
+{diff}
+
+{language_instruction}
 ```
 
 ## 요구 사항
