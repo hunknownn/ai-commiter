@@ -154,7 +154,56 @@ def categorize_file_changes(changed_files, diff):
     
     return result
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-4.1", enable_categorization=True):
+def get_recommended_model(files, diff):
+    """
+    변경사항 복잡도에 따라 모델 추천
+    """
+    
+    # 기본 메트릭
+    file_count = len(files)
+    diff_lines = len(diff.split('\n'))
+    
+    # 복잡도 점수 계산
+    complexity_score = 0
+    score_details = []
+    
+    # 파일 수에 따른 점수
+    if file_count > 10:
+        complexity_score += 3
+        score_details.append(f"파일 수 {file_count}개 (+3)")
+    elif file_count > 5:
+        complexity_score += 2
+        score_details.append(f"파일 수 {file_count}개 (+2)")
+    elif file_count > 1:
+        complexity_score += 1
+        score_details.append(f"파일 수 {file_count}개 (+1)")
+    else:
+        score_details.append(f"파일 수 {file_count}개 (+0)")
+    
+    # diff 크기에 따른 점수
+    if diff_lines > 1000:
+        complexity_score += 3
+        score_details.append(f"diff {diff_lines}줄 (+3)")
+    elif diff_lines > 500:
+        complexity_score += 2
+        score_details.append(f"diff {diff_lines}줄 (+2)")
+    elif diff_lines > 100:
+        complexity_score += 1
+        score_details.append(f"diff {diff_lines}줄 (+1)")
+    else:
+        score_details.append(f"diff {diff_lines}줄 (+0)")
+
+    # 점수에 따른 모델 선택 (3점 이상에서 GPT-4.1 사용)
+    if complexity_score >= 4:
+        selected_model = "gpt-4.1"
+        reason = "복잡한 변경사항"
+    else:
+        selected_model = "gpt-3.5-turbo"
+        reason = "간단한 변경사항"
+    
+    return selected_model, complexity_score, score_details, reason
+
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -293,7 +342,8 @@ def main():
     parser.add_argument('--repo', default='.', help='Git 저장소 경로 (기본값: 현재 디렉토리)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='스테이지된 변경사항 대신 모든 변경사항 포함')
-    parser.add_argument('--model', default='gpt-4.1', help='사용할 OpenAI 모델')
+    parser.add_argument('--model', help='수동으로 사용할 OpenAI 모델 지정 (기본: 자동 선택)')
+    parser.add_argument('--no-auto-model', action='store_true', help='자동 모델 선택 비활성화 (기본 gpt-3.5-turbo 사용)')
     parser.add_argument('--commit', action='store_true', help='자동으로 커밋 수행')
     parser.add_argument('--prompt', help='커스텀 프롬프트 템플릿 파일 경로')
     parser.add_argument('--no-categorize', action='store_true', help='파일 분류 기능 비활성화')
@@ -317,6 +367,22 @@ def main():
         print("변경된 내용이 없습니다.")
         sys.exit(0)
     
+    # 모델 선택 (기본: 자동 선택)
+    if args.model:
+        # 수동으로 모델 지정된 경우
+        selected_model = args.model
+        print(f"🎯 수동 선택: {selected_model} 모델 사용")
+    elif args.no_auto_model:
+        # 자동 선택 비활성화
+        selected_model = "gpt-3.5-turbo"
+        print(f"🔄 기본 모델: {selected_model} 사용")
+    else:
+        # 자동 모델 선택 (기본값)
+        selected_model, score, details, reason = get_recommended_model(changed_files, diff)
+        print(f"🧠 복잡도 분석: {reason} (점수: {score})")
+        print(f"   • {', '.join(details)}")
+        print(f"   → {selected_model} 모델 선택")
+    
     # 커밋 메시지 생성
     print("🤖 AI가 커밋 메시지를 생성 중입니다...")
     
@@ -331,7 +397,7 @@ def main():
             for category, files in change_summary['categories'].items():
                 print(f"  - {category.title()}: {', '.join(files)}")
     
-    commit_message = generate_commit_message(diff, changed_files, custom_prompt, args.model, 
+    commit_message = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
                                            enable_categorization=not args.no_categorize)
     
     print("\n📝 생성된 커밋 메시지:")
