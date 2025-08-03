@@ -154,7 +154,7 @@ def categorize_file_changes(changed_files, diff):
     
     return result
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True):
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-4.1", enable_categorization=True):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -293,7 +293,7 @@ def main():
     parser.add_argument('--repo', default='.', help='Git 저장소 경로 (기본값: 현재 디렉토리)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='스테이지된 변경사항 대신 모든 변경사항 포함')
-    parser.add_argument('--model', default='gpt-3.5-turbo', help='사용할 OpenAI 모델')
+    parser.add_argument('--model', default='gpt-4.1', help='사용할 OpenAI 모델')
     parser.add_argument('--commit', action='store_true', help='자동으로 커밋 수행')
     parser.add_argument('--prompt', help='커스텀 프롬프트 템플릿 파일 경로')
     parser.add_argument('--no-categorize', action='store_true', help='파일 분류 기능 비활성화')
