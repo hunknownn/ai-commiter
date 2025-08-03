@@ -12,29 +12,64 @@ import re
 from collections import defaultdict
 from ai_commiter import __version__
 
-# Language pack definitions
+# Language pack definitions with locale support
 LANGUAGE_PACKS = {
     'ko': {
-        'name': 'Korean',
-        'response_instruction': 'Please respond in Korean. The title should be in English (imperative mood), but the detailed description should be in Korean.'
+        'name': 'Korean (한국어)',
+        'locale': 'ko-KR',
+        'response_instruction': 'Please respond in Korean. The commit message title must be in English (imperative mood), but the detailed description must be written in Korean. 제목은 영어로, 상세 설명은 반드시 한국어로 작성해주세요.'
+    },
+    'ko-KR': {
+        'name': 'Korean (한국어)',
+        'locale': 'ko-KR', 
+        'response_instruction': 'Please respond in Korean. The commit message title must be in English (imperative mood), but the detailed description must be written in Korean. 제목은 영어로, 상세 설명은 반드시 한국어로 작성해주세요.'
     },
     'en': {
-        'name': 'English', 
+        'name': 'English',
+        'locale': 'en-US',
         'response_instruction': 'Please respond in English. Use imperative mood for the title and provide detailed description in English.'
     },
+    'en-US': {
+        'name': 'English (US)',
+        'locale': 'en-US',
+        'response_instruction': 'Please respond in English. Use imperative mood for the title and provide detailed description in English.'
+    },
+    'en-GB': {
+        'name': 'English (UK)',
+        'locale': 'en-GB',
+        'response_instruction': 'Please respond in British English. Use imperative mood for the title and provide detailed description in British English.'
+    },
     'ja': {
-        'name': 'Japanese',
-        'response_instruction': 'Please respond in Japanese. The title should be in English (imperative mood), but the detailed description should be in Japanese.'
+        'name': 'Japanese (日本語)',
+        'locale': 'ja-JP',
+        'response_instruction': 'Please respond in Japanese. The title should be in English (imperative mood), but the detailed description should be in Japanese. タイトルは英語で、詳細説明は日本語で記述してください。'
+    },
+    'ja-JP': {
+        'name': 'Japanese (日本語)',
+        'locale': 'ja-JP',
+        'response_instruction': 'Please respond in Japanese. The title should be in English (imperative mood), but the detailed description should be in Japanese. タイトルは英語で、詳細説明は日本語で記述してください。'
     },
     'zh': {
-        'name': 'Chinese',
-        'response_instruction': 'Please respond in Chinese. The title should be in English (imperative mood), but the detailed description should be in Chinese.'
+        'name': 'Chinese Simplified (简体中文)',
+        'locale': 'zh-CN',
+        'response_instruction': 'Please respond in Simplified Chinese. The title should be in English (imperative mood), but the detailed description should be in Simplified Chinese. 标题用英语，详细说明请用简体中文。'
+    },
+    'zh-CN': {
+        'name': 'Chinese Simplified (简体中文)',
+        'locale': 'zh-CN',
+        'response_instruction': 'Please respond in Simplified Chinese. The title should be in English (imperative mood), but the detailed description should be in Simplified Chinese. 标题用英语，详细说明请用简体中文。'
+    },
+    'zh-TW': {
+        'name': 'Chinese Traditional (繁體中文)',
+        'locale': 'zh-TW',
+        'response_instruction': 'Please respond in Traditional Chinese. The title should be in English (imperative mood), but the detailed description should be in Traditional Chinese. 標題用英語，詳細說明請用繁體中文。'
     }
 }
 
 # Unified English prompt template
 COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes. Refer to the categorized information to write a concise and clear commit message.
 After analyzing the changes, identify the core content and use only one type.
+Please read the given {language_instruction} and create an appropriate Git commit message based on it.
 
 The commit message consists of header and body.
 Each component follows these rules:
@@ -373,19 +408,21 @@ def main():
     load_dotenv()
     
     # 명령줄 인자 파싱
-    parser = argparse.ArgumentParser(description='AI를 활용한 Git 커밋 메시지 생성기')
+    parser = argparse.ArgumentParser(description='AI-powered Git commit message generator with multi-language support')
     parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}',
-                        help='버전 정보 표시')
-    parser.add_argument('--repo', default='.', help='Git 저장소 경로 (기본값: 현재 디렉토리)')
+                        help='Show version information')
+    parser.add_argument('--repo', default='.', help='Git repository path (default: current directory)')
     parser.add_argument('--all', action='store_false', dest='staged', 
-                        help='스테이지된 변경사항 대신 모든 변경사항 포함')
-    parser.add_argument('--model', help='수동으로 사용할 OpenAI 모델 지정 (기본: 자동 선택)')
-    parser.add_argument('--no-auto-model', action='store_true', help='자동 모델 선택 비활성화 (기본 gpt-3.5-turbo 사용)')
-    parser.add_argument('--commit', action='store_true', help='자동으로 커밋 수행')
-    parser.add_argument('--prompt', help='커스텀 프롬프트 템플릿 파일 경로')
-    parser.add_argument('--no-categorize', action='store_true', help='파일 분류 기능 비활성화')
-    parser.add_argument('--lang', choices=['ko', 'en', 'ja', 'zh'], default='ko',
-                        help='커밋 메시지 언어 (ko: 한국어, en: 영어, ja: 일본어, zh: 중국어)')
+                        help='Include all changes instead of staged changes only')
+    parser.add_argument('--model', help='Manually specify OpenAI model to use (default: auto-selection)')
+    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-3.5-turbo)')
+    parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
+    parser.add_argument('--prompt', help='Path to custom prompt template file')
+    parser.add_argument('--no-categorize', action='store_true', help='Disable file categorization feature')
+    parser.add_argument('--lang', 
+                        choices=['ko', 'ko-KR', 'en', 'en-US', 'en-GB', 'ja', 'ja-JP', 'zh', 'zh-CN', 'zh-TW'], 
+                        default='ko',
+                        help='Commit message language (ko/ko-KR: Korean, en/en-US/en-GB: English, ja/ja-JP: Japanese, zh/zh-CN: Chinese Simplified, zh-TW: Chinese Traditional)')
     
     args = parser.parse_args()
     
