@@ -33,11 +33,40 @@ source ~/.bashrc
 # 3. ai-commiter 설치
 pipx install ai-commiter
 
-# 4. OpenAI API 키 설정
+# 4. API 키 설정
+
+AI-Commiter는 두 가지 환경 변수를 통해 OpenAI API 키를 제공할 수 있습니다:
+
+1. `AI_COMMITER_API_KEY`: AI-Commiter 전용 (권장)
+2. `OPENAI_API_KEY`: 표준 OpenAI 환경 변수 (다른 OpenAI 애플리케이션과 공유)
+
+프로그램은 먼저 `AI_COMMITER_API_KEY`를 확인하고, 없으면 `OPENAI_API_KEY`를 사용합니다.
+
+## 일회성 설정 (현재 세션만 유효)
+```bash
 # macOS/Linux
-export OPENAI_API_KEY=your-api-key-here
+export AI_COMMITER_API_KEY=your-api-key-here
+
 # Windows
-# set OPENAI_API_KEY=your-api-key-here
+set AI_COMMITER_API_KEY=your-api-key-here
+```
+
+## 영구적 설정 (권장)
+```bash
+# macOS - zsh 사용자 (기본)
+echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.zshrc
+source ~/.zshrc
+
+# Linux/macOS - bash 사용자
+echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.bashrc
+source ~/.bashrc
+
+# Windows
+setx AI_COMMITER_API_KEY "your-api-key-here"
+# 위 명령 실행 후 터미널 재시작 필요
+```
+
+> **참고**: 기존에 `OPENAI_API_KEY`를 사용 중이라면 그대로 사용해도 됩니다.
 ```
 
 > **문제해결**: 설치 후 `ai-commit` 명령어를 찾을 수 없는 경우:

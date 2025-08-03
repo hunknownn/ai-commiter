@@ -169,10 +169,17 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         str: 생성된 커밋 메시지
     """
     # API 키 확인
-    api_key = os.getenv("OPENAI_API_KEY")
+    # AI_COMMITER_API_KEY를 우선 확인하고, 없으면 OPENAI_API_KEY 확인
+    api_key = os.getenv("AI_COMMITER_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("오류: OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        print("오류: API 키가 설정되지 않았습니다.")
+        print("AI_COMMITER_API_KEY 또는 OPENAI_API_KEY 환경 변수를 설정해주세요.")
+        print("예: export AI_COMMITER_API_KEY=your-api-key-here")
         sys.exit(1)
+    
+    # OPENAI_API_KEY 환경 변수가 없는 경우, 임시로 설정 (라이브러리가 확인하는 변수명)
+    if not os.getenv("OPENAI_API_KEY") and api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
     
     # 파일 변경 내용 분류 (여러 파일이 변경된 경우)
     change_summary = None
@@ -191,7 +198,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
 - 두 번째 줄: 비움
 - 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
 
-타입은 다음 중 하나를 사용하세요:
+타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
 feat: 새로운 기능 추가
 fix: 버그 수정
 docs: 문서 변경
@@ -222,7 +229,7 @@ chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
 - 두 번째 줄: 비움
 - 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
 
-타입은 다음 중 하나를 사용하세요:
+타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
 feat: 새로운 기능 추가
 fix: 버그 수정
 docs: 문서 변경

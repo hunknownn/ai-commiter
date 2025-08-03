@@ -169,10 +169,17 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         str: 생성된 커밋 메시지
     """
     # API 키 확인
-    api_key = os.getenv("OPENAI_API_KEY")
+    # AI_COMMITER_API_KEY를 우선 확인하고, 없으면 OPENAI_API_KEY 확인
+    api_key = os.getenv("AI_COMMITER_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("오류: OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        print("오류: API 키가 설정되지 않았습니다.")
+        print("AI_COMMITER_API_KEY 또는 OPENAI_API_KEY 환경 변수를 설정해주세요.")
+        print("예: export AI_COMMITER_API_KEY=your-api-key-here")
         sys.exit(1)
+    
+    # OPENAI_API_KEY 환경 변수가 없는 경우, 임시로 설정 (라이브러리가 확인하는 변수명)
+    if not os.getenv("OPENAI_API_KEY") and api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
     
     # 파일 변경 내용 분류 (여러 파일이 변경된 경우)
     change_summary = None
@@ -184,14 +191,21 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         if change_summary and len(files) > 1:
             # 여러 파일 변경 시 카테고리별 분류 정보를 포함한 프롬프트
             prompt_template = """
-다음은 Git 저장소의 변경 내용입니다. 여러 파일이 변경되었으므로 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
+다음은 Git 저장소의 변경 내용입니다. 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
+변경사항을 분석 후, 핵심내용을 파악하여 1가지의 타입을 사용해주세요.
 
-커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
-- 첫 줄: 변경의 요약 (타입: 내용) - 영어로 작성, 앞에 - 기호 없이 작성
-- 두 번째 줄: 비움
-- 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
+커밋 메시지는 header, body로 구성됩니다.
+각 구성은 다음의 규칙을 따릅니다.
+1. header
+- '타입: 내용' 의 형태로 작성
+- 내용은 변경사항에 대한 간략한 요약으로, 50자 이내로 작성
 
-타입은 다음 중 하나를 사용하세요:
+2. body
+- 변경 사항에 대한 상세 설명으로, 한 줄당 72자 이내로 작성
+- 어떻게 변경했는지보다 무엇을, 왜 변경했는지에 대한 설명을 작성
+- 필요에 따라 변경 사항을 여러 줄에 걸쳐 설명
+
+타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
 feat: 새로운 기능 추가
 fix: 버그 수정
 docs: 문서 변경
@@ -216,13 +230,21 @@ chore: 빌드 프로세스 또는 보조 도구 및 라이브러리 변경
         else:
             # 단일 파일 또는 분류 비활성화 시 기본 프롬프트
             prompt_template = """
-다음은 Git 저장소의 변경 내용입니다. 이 변경 내용을 바탕으로 간결하고 명확한 커밋 메시지를 작성해 주세요.
-커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
-- 첫 줄: 변경의 요약 (타입: 내용) - 영어로 작성, 앞에 - 기호 없이 작성
-- 두 번째 줄: 비움
-- 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
+다음은 Git 저장소의 변경 내용입니다. 카테고리별 분류 정보를 참고하여 간결하고 명확한 커밋 메시지를 작성해 주세요.
+변경사항을 분석 후, 핵심내용을 파악하여 1가지의 타입을 사용해주세요.
 
-타입은 다음 중 하나를 사용하세요:
+커밋 메시지는 header, body로 구성됩니다.
+각 구성은 다음의 규칙을 따릅니다.
+1. header
+- '타입: 내용' 의 형태로 작성
+- 내용은 변경사항에 대한 간략한 요약으로, 50자 이내로 작성
+
+2. body
+- 변경 사항에 대한 상세 설명으로, 한 줄당 72자 이내로 작성
+- 어떻게 변경했는지보다 무엇을, 왜 변경했는지에 대한 설명을 작성
+- 필요에 따라 변경 사항을 여러 줄에 걸쳐 설명
+
+타입은 다음 중 하나만 선택하여 사용하세요(여러 변경 내용이 있더라도 가장 중요한 변경 유형 하나만 선택):
 feat: 새로운 기능 추가
 fix: 버그 수정
 docs: 문서 변경
