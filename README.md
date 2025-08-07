@@ -107,7 +107,7 @@ pip install --upgrade ai-commiter
 현재 설치된 버전을 확인하려면:
 
 ```bash
-ai-commit --version
+grpt --version
 ```
 
 ### 저장소에서 직접 설치
@@ -130,10 +130,10 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 
 ```bash
 # 스테이지된 변경 사항에 대한 커밋 메시지 생성
-ai-commit
+grpt
 
 # 생성된 메시지로 바로 커밋
-ai-commit --commit
+grpt --commit
 
 # 패키지 설치 없이 직접 실행할 경우
 python -m ai_commiter.git_commit_ai
@@ -143,40 +143,40 @@ python -m ai_commiter.git_commit_ai
 
 ```bash
 # Multi-language support / 다국어 지원
-ai-commit --lang ko          # Korean / 한국어
-ai-commit --lang en          # English / 영어
-ai-commit --lang ja          # Japanese / 일본어
-ai-commit --lang zh-CN       # Chinese Simplified / 중국어 간체
-ai-commit --lang zh-TW       # Chinese Traditional / 중국어 번체
+grpt --lang ko          # Korean / 한국어
+grpt --lang en               # English / 영어
+grpt --lang ja               # Japanese / 일본어
+grpt --lang zh-CN            # Chinese Simplified / 중국어 간체
+grpt --lang zh-TW            # Chinese Traditional / 중국어 번체
 
 # Specify repository path / 특정 저장소 경로 지정
-ai-commit --repo /path/to/repo --model gpt-4 --commit
+grpt --repo /path/to/repo --model gpt-4 --commit
 
 # Disable file categorization / 파일 분류 기능 비활성화
-ai-commit --no-categorize
+grpt --no-categorize
 
 # Include all unstaged changes / 스테이지되지 않은 모든 변경 사항 포함
-ai-commit --all
+grpt --all
 
 # Use different OpenAI model / 다른 OpenAI 모델 사용
-ai-commit --model gpt-4
+grpt --model gpt-4
 
 # Use custom prompt template / 커스텀 프롬프트 템플릿 사용
-ai-commit --prompt my_custom_prompt.txt
+grpt --prompt my_custom_prompt.txt
 
 # Combined example / 조합 예시
-ai-commit --lang en --model gpt-4 --commit
+grpt --lang en --model gpt-4 --commit
 ```
 
 ## Supported Languages / 지원 언어
 
 | Language | Code | Locale | Example |
 |----------|------|--------|---------|
-| Korean / 한국어 | `ko`, `ko-KR` | ko-KR | `ai-commit --lang ko` |
-| English / 영어 | `en`, `en-US`, `en-GB` | en-US, en-GB | `ai-commit --lang en` |
-| Japanese / 일본어 | `ja`, `ja-JP` | ja-JP | `ai-commit --lang ja` |
-| Chinese Simplified / 중국어 간체 | `zh`, `zh-CN` | zh-CN | `ai-commit --lang zh-CN` |
-| Chinese Traditional / 중국어 번체 | `zh-TW` | zh-TW | `ai-commit --lang zh-TW` |
+| Korean / 한국어 | `ko`, `ko-KR` | ko-KR | `grpt --lang ko` |
+| English / 영어 | `en`, `en-US`, `en-GB` | en-US, en-GB | `grpt --lang en` |
+| Japanese / 일본어 | `ja`, `ja-JP` | ja-JP | `grpt --lang ja` |
+| Chinese Simplified / 중국어 간체 | `zh`, `zh-CN` | zh-CN | `grpt --lang zh-CN` |
+| Chinese Traditional / 중국어 번체 | `zh-TW` | zh-TW | `grpt --lang zh-TW` |
 
 **Note**: Commit message titles are always generated in English (imperative mood) following Conventional Commits standard, while detailed descriptions are localized to the selected language.
 

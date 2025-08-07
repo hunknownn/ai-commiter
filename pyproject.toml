@@ -30,4 +30,4 @@ Homepage = "https://github.com/hunknownn/ai-commiter"
 Issues = "https://github.com/hunknownn/ai-commiter/issues"
 
 [project.scripts]
-ai-commit = "ai_commiter.git_commit_ai:cli"
+grpt = "ai_commiter.git_commit_ai:cli"
