@@ -66,29 +66,36 @@ LANGUAGE_PACKS = {
     }
 }
 
-COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes. Refer to the categorized information to write a concise and clear commit message.
-After analyzing the changes, identify the core content and use only one type.
-Please read the given {language_instruction} and create an appropriate Git commit message based on it.
+COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes carefully. Look at the specific lines added (+) and removed (-) in the diff to understand exactly what changed. Please read the given {language_instruction} and create an appropriate Git commit message based on it.
 
-The commit message consists of header and body.
-Each component follows these rules:
+IMPORTANT: Be specific about what was actually changed. Avoid generic phrases like "update file" or "meaningful changes". Instead, describe the concrete changes you see in the diff.
+
+The commit message consists of header and body:
 1. header
-- Written in the format 'type: content'
-- Content is a brief summary of changes, written within 50 characters
+- Format: 'type: specific description of what changed'
+- Be concrete and specific (within 50 characters)
+- Examples: "Add multi-language support", "Remove redundant validation", "Fix null pointer exception"
 
-2. body
-- Detailed description of changes, written within 72 characters per line
-- Describe what and why changed rather than how it was changed
-- Explain changes across multiple lines as needed
+2. body  
+- Explain WHAT was changed and WHY (within 72 characters per line)
+- Reference specific functions, variables, or text that was modified
+- Avoid vague descriptions
+- MANDATORY: Start each line with a dash (-)
+- MANDATORY: Put each sentence on a separate line
+- MANDATORY: Press Enter after each complete thought
+- Do NOT combine multiple sentences in one line
+- Example format:
+  - First complete thought about what changed.
+  - Second complete thought about why it changed.
 
-Select only one type from the following (even if there are multiple changes, select only the most important change type):
-feat: Add new feature
-fix: Fix bug
-docs: Change documentation
-style: Change code formatting
-refactor: Code refactoring
+Select the most appropriate type (even if there are multiple changes, select only the most important change type):
+feat: Add new feature or functionality
+fix: Fix bug or error
+docs: Change documentation, comments, or text content (including prompts)
+style: Change code formatting, whitespace, semicolons (NOT content changes)
+refactor: Restructure code without changing functionality
 test: Add or modify test code
-chore: Change build process or auxiliary tools and libraries
+chore: Change build process, dependencies, or auxiliary tools
 
 Change statistics:
 - Total {total_files} files changed
