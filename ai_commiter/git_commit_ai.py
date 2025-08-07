@@ -66,30 +66,36 @@ LANGUAGE_PACKS = {
     }
 }
 
-# Unified English prompt template
-COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes. Refer to the categorized information to write a concise and clear commit message.
-After analyzing the changes, identify the core content and use only one type.
-Please read the given {language_instruction} and create an appropriate Git commit message based on it.
+COMMIT_PROMPT_TEMPLATE = '''Analyze the following Git repository changes carefully. Look at the specific lines added (+) and removed (-) in the diff to understand exactly what changed. Please read the given {language_instruction} and create an appropriate Git commit message based on it.
 
-The commit message consists of header and body.
-Each component follows these rules:
+IMPORTANT: Be specific about what was actually changed. Avoid generic phrases like "update file" or "meaningful changes". Instead, describe the concrete changes you see in the diff.
+
+The commit message consists of header and body:
 1. header
-- Written in the format 'type: content'
-- Content is a brief summary of changes, written within 50 characters
+- Format: 'type: specific description of what changed'
+- Be concrete and specific (within 50 characters)
+- Examples: "Add multi-language support", "Remove redundant validation", "Fix null pointer exception"
 
-2. body
-- Detailed description of changes, written within 72 characters per line
-- Describe what and why changed rather than how it was changed
-- Explain changes across multiple lines as needed
+2. body  
+- Explain WHAT was changed and WHY (within 72 characters per line)
+- Reference specific functions, variables, or text that was modified
+- Avoid vague descriptions
+- MANDATORY: Start each line with a dash (-)
+- MANDATORY: Put each sentence on a separate line
+- MANDATORY: Press Enter after each complete thought
+- Do NOT combine multiple sentences in one line
+- Example format:
+  - First complete thought about what changed.
+  - Second complete thought about why it changed.
 
-Select only one type from the following (even if there are multiple changes, select only the most important change type):
-feat: Add new feature
-fix: Fix bug
-docs: Change documentation
-style: Change code formatting
-refactor: Code refactoring
+Select the most appropriate type (even if there are multiple changes, select only the most important change type):
+feat: Add new feature or functionality
+fix: Fix bug or error
+docs: Change documentation, comments, or text content (including prompts)
+style: Change code formatting, whitespace, semicolons (NOT content changes)
+refactor: Restructure code without changing functionality
 test: Add or modify test code
-chore: Change build process or auxiliary tools and libraries
+chore: Change build process, dependencies, or auxiliary tools
 
 Change statistics:
 - Total {total_files} files changed
@@ -128,22 +134,41 @@ def get_git_diff(repo_path='.', staged=True):
             # 모든 변경사항
             diff = repo.git.diff()
         
-        # 변경된 파일 목록
-        if staged:
-            changed_files = repo.git.diff('--staged', '--name-only').split('\n')
-        else:
-            changed_files = repo.git.diff('--name-only').split('\n')
-        
-        # 변경 내용이 없는 경우
-        if not diff:
-            return None, []
-        
-        return diff, [f for f in changed_files if f]
+        return diff
     except git.exc.InvalidGitRepositoryError:
-        print(f"오류: '{repo_path}'는 유효한 Git 저장소가 아닙니다.")
+        print(f"Error: '{repo_path}' is not a valid Git repository.")
         sys.exit(1)
     except Exception as e:
-        print(f"Git diff 가져오기 오류: {str(e)}")
+        print(f"Git diff error: {str(e)}")
+        return diff
+
+def get_changed_files(repo_path='.', staged=True):
+    """
+    변경된 파일 목록을 가져옵니다.
+    
+    Args:
+        repo_path (str): Git 저장소 경로
+        staged (bool): True면 스테이지된 변경사항, False면 모든 변경사항
+    
+    Returns:
+        list: 변경된 파일 목록
+    """
+    try:
+        repo = git.Repo(repo_path)
+        
+        if staged:
+            # 스테이지된 변경사항만 가져오기
+            changed_files = repo.git.diff('--cached', '--name-only').split('\n')
+        else:
+            # 모든 변경사항 가져오기
+            changed_files = repo.git.diff('--name-only').split('\n')
+        
+        return [f for f in changed_files if f]
+    except git.exc.InvalidGitRepositoryError:
+        print(f"Error: '{repo_path}' is not a valid Git repository.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error getting changed files: {str(e)}")
         sys.exit(1)
 
 def categorize_file_changes(changed_files, diff):
@@ -238,8 +263,8 @@ def categorize_file_changes(changed_files, diff):
             'total_files': len(changed_files),
             'added_lines': added_lines,
             'removed_lines': removed_lines,
-            'new_files': new_files,
-            'deleted_files': deleted_files
+            'new_files': len(new_files),
+            'deleted_files': len(deleted_files)
         }
     }
     
@@ -266,29 +291,29 @@ def get_recommended_model(files, diff):
     # 파일 수에 따른 점수
     if file_count > 10:
         complexity_score += 3
-        score_details.append(f"파일 수 {file_count}개 (+3)")
+        score_details.append(f"{file_count} files (+3)")
     elif file_count > 5:
         complexity_score += 2
-        score_details.append(f"파일 수 {file_count}개 (+2)")
+        score_details.append(f"{file_count} files (+2)")
     elif file_count > 1:
         complexity_score += 1
-        score_details.append(f"파일 수 {file_count}개 (+1)")
+        score_details.append(f"{file_count} files (+1)")
     else:
-        score_details.append(f"파일 수 {file_count}개 (+0)")
+        score_details.append(f"{file_count} files (+0)")
     
     # diff 크기에 따른 점수
     if diff_lines > 1000:
         complexity_score += 3
-        score_details.append(f"diff {diff_lines}줄 (+3)")
+        score_details.append(f"{diff_lines} diff lines (+3)")
     elif diff_lines > 500:
         complexity_score += 2
-        score_details.append(f"diff {diff_lines}줄 (+2)")
+        score_details.append(f"{diff_lines} diff lines (+2)")
     elif diff_lines > 100:
         complexity_score += 1
-        score_details.append(f"diff {diff_lines}줄 (+1)")
+        score_details.append(f"{diff_lines} diff lines (+1)")
     else:
-        score_details.append(f"diff {diff_lines}줄 (+0)")
-
+        score_details.append(f"{diff_lines} diff lines (+0)")
+        
     # 점수에 따른 모델 선택 (3점 이상에서 GPT-4.1 사용)
     if complexity_score >= 4:
         selected_model = "gpt-4.1"
@@ -341,7 +366,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         "diff": diff,
         "language_instruction": get_language_instruction(lang)
     }
-    
+
     # 카테고리 정보가 있는 경우 추가 변수 설정
     if change_summary:
         stats = change_summary['stats']
@@ -358,6 +383,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
             "categorized_files": categorized_files_str if categorized_files_str else "No categorized files"
         })
         
+        # 카테고리별 프롬프트용 변수명 설정
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
                           "categorized_files", "language_instruction"]
     else:
@@ -366,7 +392,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
             "total_files": len(files),
             "added_lines": "Unknown",
             "removed_lines": "Unknown",
-            "categorized_files": "Not categorized"
+            "categorized_files": "No categorization"
         })
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
                           "categorized_files", "language_instruction"]
@@ -378,7 +404,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     
     # 너무 큰 diff는 잘라내기 (토큰 한도 고려)
     if len(prompt_vars["diff"]) > 4000:
-        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (생략됨)"
+        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (truncated)"
     
     # 커밋 메시지 생성
     result = chain.invoke(prompt_vars)
@@ -437,13 +463,19 @@ def main():
             sys.exit(1)
     
     # Git diff 가져오기
-    diff, changed_files = get_git_diff(args.repo, args.staged)
+    try:
+        diff = get_git_diff(args.repo, staged=args.staged)
+        changed_files = get_changed_files(args.repo, staged=args.staged)
+    except Exception as e:
+        print(f"Git diff error: {str(e)}")
+        sys.exit(1)
     
-    if diff is None or not changed_files:
-        print("No changes detected.")
+    # 변경사항이 없는 경우
+    if not diff.strip():
+        print("No changes found.")
         sys.exit(0)
     
-    # 모델 선택 (기본: 자동 선택)
+    # 모델 선택
     if args.model:
         # 수동으로 모델 지정된 경우
         selected_model = args.model
@@ -455,11 +487,10 @@ def main():
     else:
         # 자동 모델 선택 (기본값)
         selected_model, score, details, reason = get_recommended_model(changed_files, diff)
-        # 영어로 복잡도 이유 변환
-        english_reason = "complex changes" if reason == "복잡한 변경사항" else "simple changes"
-        print(f"🧠 Complexity analysis: {english_reason} (score: {score})")
+        reason_en = "Complex changes" if reason == "복잡한 변경사항" else "Simple changes"
+        print(f"🧠 Complexity analysis: {reason_en} (score: {score})")
         print(f"   • {', '.join(details)}")
-        print(f"   → {selected_model} model selected")
+        print(f"   → Selected {selected_model} model")
     
     # 커밋 메시지 생성
     print("🤖 AI is generating commit message...")
