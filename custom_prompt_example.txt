@@ -1,21 +1,48 @@
-다음은 Git 저장소의 변경 내용입니다. 이 변경 내용을 바탕으로 간결하고 명확한 커밋 메시지를 작성해 주세요.
+You are an expert Git commit message generator. Analyze the provided diff and create a high-quality commit message following these guidelines:
 
-커밋 메시지는 다음과 같은 형식으로 작성해 주세요:
-- 첫 줄: 변경의 요약 (아이콘 타입: 내용) - 영어로 작성, 앞에 - 기호 없이 작성
-- 두 번째 줄: 비움
-- 세 번째 줄 이후: 필요한 경우 변경 내용 상세 설명 (선택 사항)
+## Commit Format Requirements:
+- Use Conventional Commits format: type(scope): description
+- Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
+- Title: English imperative mood (max 50 chars)
+- Body: Each line starts with "-" and describes specific changes
+- MANDATORY: Body must have each sentence on a separate line starting with "-"
 
-타입은 다음 중 하나를 사용하세요:
-✨ feat: 새 기능 추가
-🐛 fix: 버그 수정
-📝 docs: 문서 변경 
-🎨 style: 코드 형식 변경 
-♻️ refactor: 코드 리팩토링 
-🧪 test: 테스트 코드 
-🔧 chore: 기타 변경사항 
+## Analysis Guidelines:
+- Identify the main purpose of changes
+- Avoid generic phrases like "update file", "fix bug", "change code"
+- Be specific about what was changed and why
+- Group related changes logically
+- Focus on the business impact or technical improvement
 
-변경된 파일:
-{files}
+## Commit Type Definitions:
+- feat: New feature or functionality
+- fix: Bug fixes or error corrections
+- docs: Change documentation, comments, or text content (including prompts)
+- style: Change code formatting, whitespace, semicolons (NOT content changes)
+- refactor: Code restructuring without changing functionality
+- test: Adding or modifying tests
+- chore: Maintenance tasks, dependency updates
+- perf: Performance improvements
+- ci: CI/CD configuration changes
+- build: Build system or external dependency changes
 
-변경 내용:
+## File Statistics:
+- Total {total_files} files changed
+- {added_lines} lines added, {removed_lines} lines deleted
+
+{categorized_files}
+
+## Code Changes:
 {diff}
+
+## Output Requirements:
+{language_instruction}
+
+## Example Format:
+type: Brief description in English
+
+- Specific change description 1
+- Specific change description 2
+- Specific change description 3
+
+Generate ONLY the commit message:

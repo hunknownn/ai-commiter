@@ -9,12 +9,13 @@ AI-powered Git commit message generator with multi-language support. Analyzes fi
 ## Key Features / 주요 기능
 
 - **🌍 Multi-language Support / 다국어 지원**: Generate commit messages in Korean, English, Japanese, Chinese (Simplified/Traditional)
-- **🤖 Automatic Commit Message Generation / 자동 커밋 메시지 생성**: Analyzes Git diff to create meaningful commit messages
-- **📝 Conventional Commits Support / Conventional Commits 지원**: Uses standardized commit message format
+- **🤖 Intelligent Commit Message Generation / 지능형 커밋 메시지 생성**: Analyzes Git diff to create specific, structured commit messages
+- **📝 Enhanced Conventional Commits / 향상된 Conventional Commits**: Uses standardized format with structured body using bullet points
 - **📁 File Categorization & Summary / 파일 분류 및 요약**: Categorizes multiple file changes and provides summary information
 - **⚙️ Custom Prompts / 커스텀 프롬프트**: Support for user-defined prompt templates
-- **⚡ Auto Commit / 자동 커밋**: Option to automatically commit with generated message
+- **⚡ Simple CLI Command / 간단한 CLI 명령어**: Use `grpt` command for quick and convenient access
 - **🧠 Multiple AI Models / 다양한 모델 지원**: Choose from various OpenAI GPT models with automatic complexity-based selection
+- **📋 Structured Output / 구조화된 출력**: Body messages formatted with bullet points for better readability
 
 ## 설치 방법
 
@@ -135,15 +136,35 @@ grpt
 # 생성된 메시지로 바로 커밋
 grpt --commit
 
+# 버전 확인
+grpt --version
+
 # 패키지 설치 없이 직접 실행할 경우
 python -m ai_commiter.git_commit_ai
+```
+
+### 출력 예시 / Output Example
+
+```
+🧠 Complexity analysis: Simple changes (score: 0)
+   • 1 files (+0), 39 diff lines (+0)
+   → Selected gpt-3.5-turbo model
+🤖 AI is generating commit message...
+
+📝 Generated commit message:
+--------------------------------------------------
+docs: Update commit prompt template
+
+- 커밋 프롬프트 템플릿 업데이트
+- 커밋 메시지 템플릿 내용 수정 및 명확하게 작성 요청
+--------------------------------------------------
 ```
 
 ### Additional Options / 추가 옵션
 
 ```bash
 # Multi-language support / 다국어 지원
-grpt --lang ko          # Korean / 한국어
+grpt --lang ko               # Korean / 한국어
 grpt --lang en               # English / 영어
 grpt --lang ja               # Japanese / 일본어
 grpt --lang zh-CN            # Chinese Simplified / 중국어 간체
@@ -159,13 +180,15 @@ grpt --no-categorize
 grpt --all
 
 # Use different OpenAI model / 다른 OpenAI 모델 사용
-grpt --model gpt-4
+grpt --model gpt-4           # For complex changes
+grpt --model gpt-3.5-turbo   # For simple changes (default)
 
 # Use custom prompt template / 커스텀 프롬프트 템플릿 사용
 grpt --prompt my_custom_prompt.txt
 
-# Combined example / 조합 예시
+# Combined examples / 조합 예시
 grpt --lang en --model gpt-4 --commit
+grpt --lang ko --no-categorize
 ```
 
 ## Supported Languages / 지원 언어
@@ -180,6 +203,26 @@ grpt --lang en --model gpt-4 --commit
 
 **Note**: Commit message titles are always generated in English (imperative mood) following Conventional Commits standard, while detailed descriptions are localized to the selected language.
 
+## What's New / 새로운 기능
+
+### Enhanced Commit Message Format / 향상된 커밋 메시지 형식
+
+- **Structured Body**: Body messages now use bullet points (-) for better readability
+- **Specific Descriptions**: AI avoids generic phrases like "update file" and provides concrete change descriptions
+- **Improved Categorization**: Better commit type classification (docs, style, feat, etc.)
+
+### Simple CLI Interface / 간단한 CLI 인터페이스
+
+- **`grpt`**: Short, memorable command name for quick and convenient usage
+- Easy to remember and type for frequent Git operations
+- Consistent command interface across all features
+
+### Enhanced Prompt System / 향상된 프롬프트 시스템
+
+- More specific instructions for AI to generate concrete commit messages
+- Mandatory formatting rules for consistent output
+- Better examples and guidelines for commit types
+
 ## Custom Prompt Templates / 커스텀 프롬프트 템플릿
 
 You can create custom prompt template files to adjust the style and format of AI-generated commit messages. Templates can use `{diff}`, `{language_instruction}`, and categorization variables.
@@ -189,13 +232,33 @@ You can create custom prompt template files to adjust the style and format of AI
 Example template / 예시 템플릿:
 
 ```
-Analyze the following changes and generate a commit message.
-Use conventional commit format: type: description
+You are an expert Git commit message generator. Analyze the provided diff and create a high-quality commit message following these guidelines:
 
-Changes:
+## Commit Format Requirements:
+- Use Conventional Commits format: type(scope): description
+- Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
+- Title: English imperative mood (max 50 chars)
+- Body: Each line starts with "-" and describes specific changes
+
+## Analysis Guidelines:
+- Identify the main purpose of changes
+- Avoid generic phrases like "update file" or "fix bug"
+- Be specific about what was changed and why
+- Group related changes logically
+
+## Code Changes:
 {diff}
 
+## Output Requirements:
 {language_instruction}
+
+## Example Output:
+feat: Add user authentication system
+
+- Implement JWT-based login/logout functionality
+- Add password hashing with bcrypt
+- Create user session management
+- Add authentication middleware for protected routes
 ```
 
 ## 요구 사항
@@ -207,3 +270,4 @@ Changes:
 ## 라이센스
 
 MIT
+
