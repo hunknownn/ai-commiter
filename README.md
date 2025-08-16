@@ -1,52 +1,90 @@
 # AI-Commiter
 
+**`grit`** = **G**it **R**eview **I**ntelligence **T**ool
+
+[![PyPI version](https://badge.fury.io/py/ai-commiter.svg)](https://badge.fury.io/py/ai-commiter)
+
 AI-powered Git commit message generator with multi-language support. Analyzes file changes and generates clear, structured commit messages using OpenAI API.
 
 인공지능을 활용한 다국어 지원 Git 커밋 메시지 생성기입니다. 파일 변경 내역을 분석하고 OpenAI API를 통해 명확하고 구조화된 커밋 메시지를 생성합니다.
 
-[![PyPI version](https://badge.fury.io/py/ai-commiter.svg)](https://badge.fury.io/py/ai-commiter)
+## ✨ Key Features
 
-## Key Features / 주요 기능
+- **🌍 Multi-language Support**: Generate commit messages in Korean, English, Japanese, Chinese (Simplified/Traditional)
+- **🤖 Intelligent Analysis**: Analyzes Git diff to create specific, structured commit messages
+- **📝 Conventional Commits**: Uses standardized format with structured body using bullet points
+- **📁 File Categorization**: Categorizes multiple file changes and provides summary information
+- **⚙️ Custom Prompts**: Support for user-defined prompt templates
+- **⚡ Simple CLI**: Use `grit` command for quick and convenient access
+- **🧠 Multiple AI Models**: Choose from various OpenAI GPT models with automatic complexity-based selection
+- **📋 Structured Output**: Body messages formatted with bullet points for better readability
 
-- **🌍 Multi-language Support / 다국어 지원**: Generate commit messages in Korean, English, Japanese, Chinese (Simplified/Traditional)
-- **🤖 Intelligent Commit Message Generation / 지능형 커밋 메시지 생성**: Analyzes Git diff to create specific, structured commit messages
-- **📝 Enhanced Conventional Commits / 향상된 Conventional Commits**: Uses standardized format with structured body using bullet points
-- **📁 File Categorization & Summary / 파일 분류 및 요약**: Categorizes multiple file changes and provides summary information
-- **⚙️ Custom Prompts / 커스텀 프롬프트**: Support for user-defined prompt templates
-- **⚡ Simple CLI Command / 간단한 CLI 명령어**: Use `grpt` command for quick and convenient access
-- **🧠 Multiple AI Models / 다양한 모델 지원**: Choose from various OpenAI GPT models with automatic complexity-based selection
-- **📋 Structured Output / 구조화된 출력**: Body messages formatted with bullet points for better readability
+## 📦 Installation
 
-## 설치 방법
-
-### pipx로 설치 (권장)
-
-[pipx](https://pypa.github.io/pipx/)는 애플리케이션을 격리된 환경에 설치하여 의존성 충돌 없이 사용할 수 있게 해줍니다.
+### Option 1: Homebrew (macOS Recommended)
 
 ```bash
-# 1. pipx 설치 (처음 사용시)
-pip install pipx
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python and pipx
+brew install python pipx
+pipx ensurepath && source ~/.zshrc
+
+# Install AI-Commiter
+pipx install ai-commiter
+```
+
+### Option 2: pipx (Cross-platform)
+
+```bash
+# Install pipx
+pip3 install pipx  # macOS/Linux
 pipx ensurepath
 
-# 2. 환경 변수 적용 (하나를 선택)
-# macOS 사용자 (기본 zsh)
+# Apply environment variables
+source ~/.zshrc     # macOS (zsh)
+source ~/.bashrc    # Linux (bash)
+
+# Install AI-Commiter
+pipx install ai-commiter
+```
+
+### Option 3: pip3 (Direct installation)
+
+```bash
+# macOS/Linux
+pip3 install ai-commiter
+
+# Windows
+pip install ai-commiter
+```
+
+## 🔑 API Key Setup
+
+AI-Commiter supports two environment variables for OpenAI API key:
+
+1. `AI_COMMITER_API_KEY` - Dedicated for AI-Commiter (recommended)
+2. `OPENAI_API_KEY` - Standard OpenAI environment variable
+
+### Permanent Setup (Recommended)
+
+```bash
+# macOS (zsh)
+echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.zshrc
 source ~/.zshrc
-# Linux 또는 기타 bash 사용자
+
+# Linux (bash)
+echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.bashrc
 source ~/.bashrc
 
-# 3. ai-commiter 설치
-pipx install ai-commiter
+# Windows
+setx AI_COMMITER_API_KEY "your-api-key-here"
+# Restart terminal after running the command
+```
 
-# 4. API 키 설정
+### Temporary Setup
 
-AI-Commiter는 두 가지 환경 변수를 통해 OpenAI API 키를 제공할 수 있습니다:
-
-1. `AI_COMMITER_API_KEY`: AI-Commiter 전용 (권장)
-2. `OPENAI_API_KEY`: 표준 OpenAI 환경 변수 (다른 OpenAI 애플리케이션과 공유)
-
-프로그램은 먼저 `AI_COMMITER_API_KEY`를 확인하고, 없으면 `OPENAI_API_KEY`를 사용합니다.
-
-## 일회성 설정 (현재 세션만 유효)
 ```bash
 # macOS/Linux
 export AI_COMMITER_API_KEY=your-api-key-here
@@ -55,95 +93,80 @@ export AI_COMMITER_API_KEY=your-api-key-here
 set AI_COMMITER_API_KEY=your-api-key-here
 ```
 
-## 영구적 설정 (권장)
-```bash
-# macOS - zsh 사용자 (기본)
-echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.zshrc
-source ~/.zshrc
-
-# Linux/macOS - bash 사용자
-echo 'export AI_COMMITER_API_KEY=your-api-key-here' >> ~/.bashrc
-source ~/.bashrc
-
-# Windows
-setx AI_COMMITER_API_KEY "your-api-key-here"
-# 위 명령 실행 후 터미널 재시작 필요
-```
-
-> **참고**: 기존에 `OPENAI_API_KEY`를 사용 중이라면 그대로 사용해도 됩니다.
-```
-
-> **문제해결**: 설치 후 `ai-commit` 명령어를 찾을 수 없는 경우:
-> 1. `pipx ensurepath` 실행
-> 2. `source ~/.zshrc` (macOS) 또는 `source ~/.bashrc` (Linux) 실행
-> 3. 새로운 터미널을 열어 시도
-
-### pip로 설치
+## 🔄 Upgrade
 
 ```bash
-pip install ai-commiter
-
-# OpenAI API 키 설정
-export OPENAI_API_KEY=your-api-key-here
-# Windows에서는
-# set OPENAI_API_KEY=your-api-key-here
-```
-
-## 업그레이드
-
-새 버전이 출시되면 다음 명령어를 사용하여 업그레이드할 수 있습니다:
-
-### pipx로 설치한 경우
-
-```bash
+# pipx
 pipx upgrade ai-commiter
-```
 
-### pip로 설치한 경우
+# pip3 (macOS/Linux)
+pip3 install --upgrade ai-commiter
 
-```bash
+# pip (Windows)
 pip install --upgrade ai-commiter
+
+# Check version
+grit --version
 ```
 
-현재 설치된 버전을 확인하려면:
+## 🚀 Quick Start
 
 ```bash
-grpt --version
+# Generate commit message (preview)
+grit
+
+# Generate and commit automatically
+grit --commit
+
+# Use Korean language
+grit --lang ko --commit
+
+# Use GPT-4 for complex changes
+grit --model gpt-4 --commit
 ```
 
-### 저장소에서 직접 설치
+## 📝 Usage Examples
 
 ```bash
-# 저장소 클론
-git clone https://github.com/your-username/ai-commiter.git
-cd ai-commiter
+# Basic usage
+grit                         # Preview commit message
+grit --commit                # Generate and commit
+grit --repo /path/to/repo    # Specify repository path
 
-# 패키지로 설치
-pip install -e .
+# Language options
+grit --lang ko               # Korean
+grit --lang en               # English (default)
+grit --lang ja               # Japanese
+grit --lang zh-CN            # Chinese Simplified
+grit --lang zh-TW            # Chinese Traditional
 
-# OpenAI API 키 설정
-echo "OPENAI_API_KEY=your-api-key-here" > .env
+# Model selection
+grit --model gpt-4           # For complex changes
+grit --model gpt-3.5-turbo   # For simple changes (default)
+
+# Advanced options
+grit --all                   # Include unstaged changes
+grit --no-categorize         # Disable file categorization
+grit --prompt custom.txt     # Use custom prompt template
+
+# Combined examples
+grit --lang ko --model gpt-4 --commit
+grit --all --no-categorize --lang en
 ```
 
-## 사용 방법
+## 🌍 Supported Languages
 
-### 기본 사용법
+| Language | Code | Example |
+|----------|------|--------|
+| Korean | `ko`, `ko-KR` | `grit --lang ko` |
+| English | `en`, `en-US`, `en-GB` | `grit --lang en` |
+| Japanese | `ja`, `ja-JP` | `grit --lang ja` |
+| Chinese (Simplified) | `zh`, `zh-CN` | `grit --lang zh-CN` |
+| Chinese (Traditional) | `zh-TW` | `grit --lang zh-TW` |
 
-```bash
-# 스테이지된 변경 사항에 대한 커밋 메시지 생성
-grpt
+> **Note**: Commit titles are always in English (imperative mood) following Conventional Commits standard. Only the detailed descriptions are localized.
 
-# 생성된 메시지로 바로 커밋
-grpt --commit
-
-# 버전 확인
-grpt --version
-
-# 패키지 설치 없이 직접 실행할 경우
-python -m ai_commiter.git_commit_ai
-```
-
-### 출력 예시 / Output Example
+## 📋 Output Example
 
 ```
 🧠 Complexity analysis: Simple changes (score: 0)
@@ -160,114 +183,43 @@ docs: Update commit prompt template
 --------------------------------------------------
 ```
 
-### Additional Options / 추가 옵션
+## ⚙️ Custom Prompt Templates
+
+Create custom prompt template files to adjust AI-generated commit message style:
 
 ```bash
-# Multi-language support / 다국어 지원
-grpt --lang ko               # Korean / 한국어
-grpt --lang en               # English / 영어
-grpt --lang ja               # Japanese / 일본어
-grpt --lang zh-CN            # Chinese Simplified / 중국어 간체
-grpt --lang zh-TW            # Chinese Traditional / 중국어 번체
-
-# Specify repository path / 특정 저장소 경로 지정
-grpt --repo /path/to/repo --model gpt-4 --commit
-
-# Disable file categorization / 파일 분류 기능 비활성화
-grpt --no-categorize
-
-# Include all unstaged changes / 스테이지되지 않은 모든 변경 사항 포함
-grpt --all
-
-# Use different OpenAI model / 다른 OpenAI 모델 사용
-grpt --model gpt-4           # For complex changes
-grpt --model gpt-3.5-turbo   # For simple changes (default)
-
-# Use custom prompt template / 커스텀 프롬프트 템플릿 사용
-grpt --prompt my_custom_prompt.txt
-
-# Combined examples / 조합 예시
-grpt --lang en --model gpt-4 --commit
-grpt --lang ko --no-categorize
+# Use custom template
+grit --prompt my_template.txt
 ```
 
-## Supported Languages / 지원 언어
+**Template variables:**
+- `{diff}` - Git diff content
+- `{language_instruction}` - Language-specific instructions
+- Categorization variables for file types
 
-| Language | Code | Locale | Example |
-|----------|------|--------|---------|
-| Korean / 한국어 | `ko`, `ko-KR` | ko-KR | `grpt --lang ko` |
-| English / 영어 | `en`, `en-US`, `en-GB` | en-US, en-GB | `grpt --lang en` |
-| Japanese / 일본어 | `ja`, `ja-JP` | ja-JP | `grpt --lang ja` |
-| Chinese Simplified / 중국어 간체 | `zh`, `zh-CN` | zh-CN | `grpt --lang zh-CN` |
-| Chinese Traditional / 중국어 번체 | `zh-TW` | zh-TW | `grpt --lang zh-TW` |
-
-**Note**: Commit message titles are always generated in English (imperative mood) following Conventional Commits standard, while detailed descriptions are localized to the selected language.
-
-## What's New / 새로운 기능
-
-### Enhanced Commit Message Format / 향상된 커밋 메시지 형식
-
-- **Structured Body**: Body messages now use bullet points (-) for better readability
-- **Specific Descriptions**: AI avoids generic phrases like "update file" and provides concrete change descriptions
-- **Improved Categorization**: Better commit type classification (docs, style, feat, etc.)
-
-### Simple CLI Interface / 간단한 CLI 인터페이스
-
-- **`grpt`**: Short, memorable command name for quick and convenient usage
-- Easy to remember and type for frequent Git operations
-- Consistent command interface across all features
-
-### Enhanced Prompt System / 향상된 프롬프트 시스템
-
-- More specific instructions for AI to generate concrete commit messages
-- Mandatory formatting rules for consistent output
-- Better examples and guidelines for commit types
-
-## Custom Prompt Templates / 커스텀 프롬프트 템플릿
-
-You can create custom prompt template files to adjust the style and format of AI-generated commit messages. Templates can use `{diff}`, `{language_instruction}`, and categorization variables.
-
-커스텀 프롬프트 템플릿 파일을 만들어 AI가 생성하는 커밋 메시지의 스타일과 형식을 조정할 수 있습니다.
-
-Example template / 예시 템플릿:
-
+**Example template:**
 ```
-You are an expert Git commit message generator. Analyze the provided diff and create a high-quality commit message following these guidelines:
+You are an expert Git commit message generator. Create a commit message following Conventional Commits format.
 
-## Commit Format Requirements:
-- Use Conventional Commits format: type(scope): description
-- Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build
+## Requirements:
+- Type: feat, fix, docs, style, refactor, test, chore, perf, ci, build
 - Title: English imperative mood (max 50 chars)
-- Body: Each line starts with "-" and describes specific changes
-
-## Analysis Guidelines:
-- Identify the main purpose of changes
-- Avoid generic phrases like "update file" or "fix bug"
-- Be specific about what was changed and why
-- Group related changes logically
+- Body: Bullet points with specific changes
 
 ## Code Changes:
 {diff}
 
-## Output Requirements:
+## Language:
 {language_instruction}
-
-## Example Output:
-feat: Add user authentication system
-
-- Implement JWT-based login/logout functionality
-- Add password hashing with bcrypt
-- Create user session management
-- Add authentication middleware for protected routes
 ```
 
-## 요구 사항
+## 📋 Requirements
 
-- Python 3.7 이상
+- Python 3.7+
 - Git
-- OpenAI API 키
+- OpenAI API Key
 
-## 라이센스
+## 📄 License
 
-MIT
+MIT License
 
