@@ -146,12 +146,11 @@ grit --model gpt-3.5-turbo   # For simple changes (default)
 
 # Advanced options
 grit --all                   # Include unstaged changes
-grit --no-categorize         # Disable file categorization
 grit --prompt custom.txt     # Use custom prompt template
 
 # Combined examples
 grit --lang ko --model gpt-4 --commit
-grit --all --no-categorize --lang en
+grit --all --lang en
 ```
 
 ## 🌍 Supported Languages
@@ -218,6 +217,14 @@ You are an expert Git commit message generator. Create a commit message followin
 - Python 3.7+
 - Git
 - OpenAI API Key
+
+## 🆕 What's New
+
+### v0.2.0
+- **Always Use Full Diff**: Removed complexity-based diff length limits for better commit message generation
+- **Always Enable File Categorization**: Removed `--no-categorize` option to always provide structured, categorized commits
+- **Improved Complexity Scoring**: Adjusted auto-split threshold from 1 to 5 for better user experience
+- **Enhanced Commit Splitting**: Improved handling of skipped commits with proper staging/unstaging
 
 ## 📄 License
 
