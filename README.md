@@ -220,6 +220,11 @@ You are an expert Git commit message generator. Create a commit message followin
 
 ## 🆕 What's New
 
+### v0.2.1
+- **Fixed Version Display**: Updated `__init__.py` version to properly show version in CLI commands
+- **Code Consistency**: Improved package structure and code consistency
+- **CLI Improvements**: Removed deprecated options from help message
+
 ### v0.2.0
 - **Always Use Full Diff**: Removed complexity-based diff length limits for better commit message generation
 - **Always Enable File Categorization**: Removed `--no-categorize` option to always provide structured, categorized commits
