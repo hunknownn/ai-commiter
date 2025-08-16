@@ -275,36 +275,40 @@ def categorize_file_changes(changed_files, diff):
     
     return result
 
-def get_recommended_model(files, diff):
+def calculate_complexity_score(diff, files):
     """
-    변경사항 복잡도에 따라 모델 추천
+    변경 내용의 복잡도를 계산합니다.
+    
+    Args:
+        diff (str): Git diff 내용
+        files (list): 변경된 파일 목록
+    
+    Returns:
+        tuple: (복잡도 점수, 점수 세부 사항)
     """
-    
-    # 기본 메트릭
-    file_count = len(files)
-    diff_lines = len(diff.split('\n'))
-    
-    # 복잡도 점수 계산
+    # 복잡도 점수 초기화
     complexity_score = 0
     score_details = []
     
-    # 파일 수에 따른 점수
-    if file_count > 10:
-        complexity_score += 3
-        score_details.append(f"{file_count} files (+3)")
-    elif file_count > 5:
+    # 파일 수에 따른 복잡도 평가
+    num_files = len(files)
+    if num_files >= 10:
+        complexity_score += 4
+        score_details.append(f"{num_files} files (+4)")
+    elif num_files >= 5:
         complexity_score += 2
-        score_details.append(f"{file_count} files (+2)")
-    elif file_count > 1:
+        score_details.append(f"{num_files} files (+2)")
+    elif num_files > 1:
         complexity_score += 1
-        score_details.append(f"{file_count} files (+1)")
+        score_details.append(f"{num_files} files (+1)")
     else:
-        score_details.append(f"{file_count} files (+0)")
+        score_details.append(f"{num_files} files (+0)")
     
-    # diff 크기에 따른 점수
+    # diff 크기에 따른 복잡도 평가
+    diff_lines = len(diff.split('\n'))
     if diff_lines > 1000:
-        complexity_score += 3
-        score_details.append(f"{diff_lines} diff lines (+3)")
+        complexity_score += 4
+        score_details.append(f"{diff_lines} diff lines (+4)")
     elif diff_lines > 500:
         complexity_score += 2
         score_details.append(f"{diff_lines} diff lines (+2)")
@@ -314,6 +318,18 @@ def get_recommended_model(files, diff):
     else:
         score_details.append(f"{diff_lines} diff lines (+0)")
         
+    return complexity_score, score_details
+
+def select_model_by_complexity(complexity_score):
+    """
+    복잡도 점수를 기반으로 최적의 AI 모델을 선택합니다.
+    
+    Args:
+        complexity_score (int): 계산된 복잡도 점수
+    
+    Returns:
+        tuple: (선택된 모델명, 선택 이유)
+    """
     # 점수에 따른 모델 선택 (속도와 성능 균형 고려)
     if complexity_score >= 5:
         selected_model = "gpt-5"
@@ -325,7 +341,7 @@ def get_recommended_model(files, diff):
         selected_model = "gpt-4o-mini"
         reason = "간단한 변경사항 (빠르고 안정적)"
     
-    return selected_model, complexity_score, score_details, reason
+    return selected_model, reason
 
 def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-4o-mini", enable_categorization=True, lang='ko', complexity_score=0):
     """
@@ -409,16 +425,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     chain_prompt = PromptTemplate(input_variables=input_variables, template=prompt_template)
     chain = chain_prompt | llm
     
-    # 복잡도에 따른 diff 길이 제한 (변경사항 이해도와 속도 균형)
-    if complexity_score >= 4:
-        max_diff_length = 5000  # 복잡한 변경사항 - 더 많은 컨텍스트 필요
-    elif complexity_score >= 2:
-        max_diff_length = 3500  # 중간 복잡도 - 적당한 컨텍스트
-    else:
-        max_diff_length = 2500  # 간단한 변경사항 - 빠른 처리
-    
-    if len(prompt_vars["diff"]) > max_diff_length:
-        prompt_vars["diff"] = prompt_vars["diff"][:max_diff_length] + f"\n... (truncated at {max_diff_length} chars for optimal processing)"
+    # 항상 전체 diff 사용 (복잡도에 따른 제한 없음)
     
     # 커밋 메시지 생성 및 토큰 사용량 추적
     try:
@@ -480,9 +487,12 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
     Returns:
         bool: 모든 커밋 성공 여부
     """
-    if not changed_files:
+    if not changed_files or not diff:
         print("No files to commit.")
         return False
+    
+    # 스킵된 파일들을 추적하기 위한 집합 초기화
+    skipped_files = set()
     
     repo = git.Repo(repo_path)
     
@@ -500,8 +510,8 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
     change_summary = categorize_file_changes(changed_files, diff)
     categories = change_summary['categories']
     
-    # 카테고리가 없거나 파일이 한 개이면 그냥 모든 파일을 하나의 커밋으로 처리
-    if not categories or len(changed_files) <= 1:
+    # 카테고리가 없는 경우 모든 파일을 하나의 커밋으로 처리
+    if not categories:
         try:
             for file in staged_files:
                 repo.git.add(file)
@@ -537,18 +547,24 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
     
     for idx, (category, files) in enumerate(categories.items()):
         try:
-            # 현재 카테고리의 파일들만 스테이징
+            # 현재 카테고리의 파일들만 스테이징 (-A 옵션으로 파일 이동/이름변경 전환 유지)
             for file in files:
-                repo.git.add(file)
+                repo.git.add('-A', file)
             
             # 현재 스테이지된 파일들의 diff 가져오기
             commit_diff = get_git_diff(repo_path, staged=True)
             
+            # 각 카테고리별 변경사항에 맞는 복잡도 계산 및 모델 선택
+            category_complexity_score, score_details = calculate_complexity_score(commit_diff, files)
+            category_model, model_reason = select_model_by_complexity(category_complexity_score)
+            
             # 커밋 메시지 생성
             print(f"COMMIT {idx+1}/{total_categories} - {category.title()} changes:")
             print(f" - Modified: {', '.join(files)}")
+            print(f" - Complexity: {category_complexity_score} ({', '.join(score_details)})")
+            print(f" - Using {category_model} model: {model_reason}")
             
-            result = generate_commit_message(commit_diff, files, custom_prompt, model, 
+            result = generate_commit_message(commit_diff, files, custom_prompt, category_model, 
                                          enable_categorization=True, lang=lang)
             
             if result[0] is None:
@@ -569,9 +585,27 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
                 else:
                     print(f"❌ Failed to create commit {idx+1}/{total_categories}\n")
             else:
+                # 해당 카테고리의 파일들을 스테이징에서 해제하고 스킵된 파일 목록에 추가
+                for file in files:
+                    try:
+                        repo.git.reset('HEAD', file)
+                        # 스킵된 파일 추적
+                        skipped_files.add(file)
+                    except Exception as reset_error:
+                        print(f"Warning: Could not unstage {file}: {str(reset_error)}")
                 print(f"⏭️ Skipped commit {idx+1}/{total_categories}\n")
         except Exception as e:
             print(f"❌ Error in commit {idx+1}/{total_categories}: {str(e)}\n")
+    
+    # 스킵된 파일들을 다시 스테이징
+    if skipped_files:
+        print("\n🔄 Restoring skipped files to staging area...")
+        for file in skipped_files:
+            try:
+                repo.git.add('-A', file)
+                print(f"✅ Restored: {file}")
+            except Exception as e:
+                print(f"❌ Failed to restore {file}: {str(e)}")
     
     # 결과 요약
     if successful_commits == total_categories:
@@ -595,7 +629,6 @@ def main():
     parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-4o-mini)')
     parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
     parser.add_argument('--prompt', help='Path to custom prompt template file')
-    parser.add_argument('--no-categorize', action='store_true', help='Disable file categorization feature')
     parser.add_argument('--lang', 
                         choices=['ko', 'ko-KR', 'en', 'en-US', 'en-GB', 'ja', 'ja-JP', 'zh', 'zh-CN', 'zh-TW'], 
                         default='ko',
@@ -640,14 +673,15 @@ def main():
         print(f"🔄 Default model: Using {selected_model}")
     else:
         # 자동 모델 선택 (기본값)
-        selected_model, complexity_score, details, reason = get_recommended_model(changed_files, diff)
-        reason_en = "Complex changes" if reason == "복잡한 변경사항" else "Simple changes"
+        complexity_score, score_details = calculate_complexity_score(diff, changed_files)
+        selected_model, model_reason = select_model_by_complexity(complexity_score)
+        reason_en = "Complex changes" if "복잡한" in model_reason else "Simple changes"
         print(f"🧠 Complexity analysis: {reason_en} (score: {complexity_score})")
-        print(f"   • {', '.join(details)}")
+        print(f"   • {', '.join(score_details)}")
         print(f"   → Selected {selected_model} model")
     
     # 파일 분류 정보 출력 (여러 파일 변경 시)
-    if len(changed_files) > 1 and not args.no_categorize:
+    if len(changed_files) > 1:
         change_summary = categorize_file_changes(changed_files, diff)
         print(f"\n📊 Change statistics: {change_summary['stats']['total_files']} files, "
               f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} lines")
@@ -658,7 +692,7 @@ def main():
                 print(f"  - {category.title()}: {', '.join(files)}")
     
     # 복잡도에 따른 커밋 처리 분기
-    should_split = complexity_score >= 1 and args.auto_split and len(changed_files) >= 1
+    should_split = complexity_score >= 5 and args.auto_split and len(changed_files) >= 1
     
     if should_split and args.commit:
         print("\n🤔 This is a complex change with multiple files.")
@@ -681,7 +715,7 @@ def main():
     # 단일 커밋 메시지 생성
     print("🤖 AI is generating commit message...")
     result = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
-                                   enable_categorization=not args.no_categorize, lang=args.lang, 
+                                   enable_categorization=True, lang=args.lang, 
                                    complexity_score=complexity_score)
     
     if result[0] is None:
