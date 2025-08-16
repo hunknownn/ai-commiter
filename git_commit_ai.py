@@ -314,17 +314,20 @@ def get_recommended_model(files, diff):
     else:
         score_details.append(f"{diff_lines} diff lines (+0)")
         
-    # 점수에 따른 모델 선택 (3점 이상에서 GPT-4.1 사용)
+    # 점수에 따른 모델 선택 (GPT-5 시리즈 사용)
     if complexity_score >= 4:
-        selected_model = "gpt-4.1"
-        reason = "복잡한 변경사항"
+        selected_model = "gpt-5"
+        reason = "복잡한 변경사항 (최고 성능)"
+    elif complexity_score >= 2:
+        selected_model = "gpt-5-mini"
+        reason = "중간 복잡도 변경사항 (균형적 성능)"
     else:
-        selected_model = "gpt-3.5-turbo"
-        reason = "간단한 변경사항"
+        selected_model = "gpt-5-nano"
+        reason = "간단한 변경사항 (빠르고 경제적)"
     
     return selected_model, complexity_score, score_details, reason
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-3.5-turbo", enable_categorization=True, lang='ko'):
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-5-nano", enable_categorization=True, lang='ko'):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -398,7 +401,11 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
                           "categorized_files", "language_instruction"]
     
     # LangChain 설정 (토큰 사용량 추적을 위해 callbacks 활용)
-    llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
+    # GPT-5 시리즈는 temperature 제약이 있을 수 있음
+    if 'gpt-5' in openai_model.lower():
+        llm = ChatOpenAI(model_name=openai_model)  # GPT-5는 기본값 사용
+    else:
+        llm = ChatOpenAI(temperature=0.5, model_name=openai_model)  # 이전 모델은 0.5 사용
     chain_prompt = PromptTemplate(input_variables=input_variables, template=prompt_template)
     chain = chain_prompt | llm
     
@@ -455,7 +462,7 @@ def main():
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='Include all changes instead of staged changes only')
     parser.add_argument('--model', help='Manually specify OpenAI model to use (default: auto-selection)')
-    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-3.5-turbo)')
+    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-5-nano)')
     parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
     parser.add_argument('--prompt', help='Path to custom prompt template file')
     parser.add_argument('--no-categorize', action='store_true', help='Disable file categorization feature')
@@ -496,7 +503,7 @@ def main():
         print(f"🎯 Manual selection: Using {selected_model} model")
     elif args.no_auto_model:
         # 자동 선택 비활성화
-        selected_model = "gpt-3.5-turbo"
+        selected_model = "gpt-5-nano"
         print(f"🔄 Default model: Using {selected_model}")
     else:
         # 자동 모델 선택 (기본값)
