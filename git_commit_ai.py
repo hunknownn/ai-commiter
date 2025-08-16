@@ -78,15 +78,15 @@ The commit message consists of header and body:
 
 2. body  
 - Explain WHAT was changed and WHY (within 72 characters per line)
-- Reference specific functions, variables, or text that was modified
-- Avoid vague descriptions
+- Keep it CONCISE and focused (maximum 3-4 lines)
+- Group related changes into single points, avoid listing every detail
+- Focus on the main purpose and impact, not individual file changes
 - MANDATORY: Start each line with a dash (-)
 - MANDATORY: Put each sentence on a separate line
-- MANDATORY: Press Enter after each complete thought
-- Do NOT combine multiple sentences in one line
 - Example format:
-  - First complete thought about what changed.
-  - Second complete thought about why it changed.
+  - Main change or feature that was implemented
+  - Key reason or benefit for this change
+  - Important technical detail (if needed)
 
 Select the most appropriate type (even if there are multiple changes, select only the most important change type):
 feat: Add new feature or functionality
@@ -314,20 +314,20 @@ def get_recommended_model(files, diff):
     else:
         score_details.append(f"{diff_lines} diff lines (+0)")
         
-    # 점수에 따른 모델 선택 (GPT-5 시리즈 사용)
-    if complexity_score >= 4:
+    # 점수에 따른 모델 선택 (속도와 성능 균형 고려)
+    if complexity_score >= 5:
         selected_model = "gpt-5"
         reason = "복잡한 변경사항 (최고 성능)"
     elif complexity_score >= 2:
         selected_model = "gpt-5-mini"
         reason = "중간 복잡도 변경사항 (균형적 성능)"
     else:
-        selected_model = "gpt-5-nano"
-        reason = "간단한 변경사항 (빠르고 경제적)"
+        selected_model = "gpt-4o-mini"
+        reason = "간단한 변경사항 (빠르고 안정적)"
     
     return selected_model, complexity_score, score_details, reason
 
-def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-5-nano", enable_categorization=True, lang='ko'):
+def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt-4o-mini", enable_categorization=True, lang='ko', complexity_score=0):
     """
     변경 내용을 기반으로 커밋 메시지를 생성합니다.
     
@@ -409,9 +409,16 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     chain_prompt = PromptTemplate(input_variables=input_variables, template=prompt_template)
     chain = chain_prompt | llm
     
-    # 너무 큰 diff는 잘라내기 (토큰 한도 고려)
-    if len(prompt_vars["diff"]) > 4000:
-        prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (truncated)"
+    # 복잡도에 따른 diff 길이 제한 (변경사항 이해도와 속도 균형)
+    if complexity_score >= 4:
+        max_diff_length = 5000  # 복잡한 변경사항 - 더 많은 컨텍스트 필요
+    elif complexity_score >= 2:
+        max_diff_length = 3500  # 중간 복잡도 - 적당한 컨텍스트
+    else:
+        max_diff_length = 2500  # 간단한 변경사항 - 빠른 처리
+    
+    if len(prompt_vars["diff"]) > max_diff_length:
+        prompt_vars["diff"] = prompt_vars["diff"][:max_diff_length] + f"\n... (truncated at {max_diff_length} chars for optimal processing)"
     
     # 커밋 메시지 생성 및 토큰 사용량 추적
     try:
@@ -440,15 +447,139 @@ def make_commit(repo_path='.', message=None):
     Args:
         repo_path (str): Git 저장소 경로
         message (str): 커밋 메시지
+        
+    Returns:
+        bool: 커밋 성공 여부
     """
+    if message is None:
+        print("No commit message provided.")
+        return False
+        
     try:
         repo = git.Repo(repo_path)
         repo.git.commit('-m', message)
-        print(f"✅ Successfully committed: '{message}'")
+        print("✅ Commit successful!")
         return True
     except Exception as e:
-        print(f"Commit error: {str(e)}")
+        print(f"❌ Commit failed: {str(e)}")
         return False
+
+
+def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custom_prompt=None, model="gpt-4o-mini", lang='ko'):
+    """
+    변경사항을 카테고리별로 분할하여 순차적으로 커밋합니다.
+    
+    Args:
+        repo_path (str): Git 저장소 경로
+        changed_files (list): 변경된 파일 목록
+        diff (str): 전체 Git diff 내용
+        custom_prompt (str, optional): 커스텀 프롬프트 템플릿
+        model (str): 사용할 OpenAI 모델
+        lang (str): 커밋 메시지 언어
+    
+    Returns:
+        bool: 모든 커밋 성공 여부
+    """
+    if not changed_files:
+        print("No files to commit.")
+        return False
+    
+    repo = git.Repo(repo_path)
+    
+    # 현재 스테이징된 모든 파일 목록 저장
+    staged_files = changed_files.copy()
+    
+    # 스테이징 영역 초기화
+    try:
+        repo.git.reset()
+    except Exception as e:
+        print(f"Failed to reset staging area: {str(e)}")
+        return False
+    
+    # 파일을 카테고리별로 분류
+    change_summary = categorize_file_changes(changed_files, diff)
+    categories = change_summary['categories']
+    
+    # 카테고리가 없거나 파일이 한 개이면 그냥 모든 파일을 하나의 커밋으로 처리
+    if not categories or len(changed_files) <= 1:
+        try:
+            for file in staged_files:
+                repo.git.add(file)
+            
+            commit_diff = get_git_diff(repo_path, staged=True)
+            result = generate_commit_message(commit_diff, staged_files, custom_prompt, model, 
+                                         enable_categorization=True, lang=lang)
+            
+            if result[0] is None:
+                print("❌ Failed to generate commit message")
+                return False
+            
+            commit_message, _ = result
+            print(f"📝 Generated message:\n{commit_message}\n")
+            
+            # 사용자에게 커밋 여부 확인
+            confirm = input(f"Proceed with this commit? (y/n): ").strip().lower()
+            
+            if confirm == 'y':
+                return make_commit(repo_path, commit_message)
+            else:
+                print(f"⏭️ Commit skipped")
+                return False
+        except Exception as e:
+            print(f"❌ Commit failed: {str(e)}")
+            return False
+    
+    # 카테고리별로 순차적으로 커밋
+    successful_commits = 0
+    total_categories = len(categories)
+    
+    print(f"\n🔄 Auto-splitting changes into {total_categories} logical commits...\n")
+    
+    for idx, (category, files) in enumerate(categories.items()):
+        try:
+            # 현재 카테고리의 파일들만 스테이징
+            for file in files:
+                repo.git.add(file)
+            
+            # 현재 스테이지된 파일들의 diff 가져오기
+            commit_diff = get_git_diff(repo_path, staged=True)
+            
+            # 커밋 메시지 생성
+            print(f"COMMIT {idx+1}/{total_categories} - {category.title()} changes:")
+            print(f" - Modified: {', '.join(files)}")
+            
+            result = generate_commit_message(commit_diff, files, custom_prompt, model, 
+                                         enable_categorization=True, lang=lang)
+            
+            if result[0] is None:
+                print("❌ Failed to generate commit message for this category")
+                continue
+            
+            commit_message, _ = result
+            print(f"📝 Generated message:\n{commit_message}\n")
+            
+            # 사용자에게 커밋 여부 확인
+            confirm = input(f"Proceed with this commit {idx+1}/{total_categories} ({category.title()})? (y/n): ").strip().lower()
+            
+            if confirm == 'y':
+                # 커밋 실행
+                if make_commit(repo_path, commit_message):
+                    successful_commits += 1
+                    print(f"✅ Created commit {idx+1}/{total_categories}\n")
+                else:
+                    print(f"❌ Failed to create commit {idx+1}/{total_categories}\n")
+            else:
+                print(f"⏭️ Skipped commit {idx+1}/{total_categories}\n")
+        except Exception as e:
+            print(f"❌ Error in commit {idx+1}/{total_categories}: {str(e)}\n")
+    
+    # 결과 요약
+    if successful_commits == total_categories:
+        print(f"🎉 Successfully created {successful_commits} logical commits!")
+        return True
+    else:
+        print(f"⚠️ Created {successful_commits}/{total_categories} commits with some errors.")
+        return successful_commits > 0
 
 def main():
     # .env 파일 로드
@@ -456,13 +587,12 @@ def main():
     
     # 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI-powered Git commit message generator with multi-language support')
-    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}',
-                        help='Show version information')
+    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
     parser.add_argument('--repo', default='.', help='Git repository path (default: current directory)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='Include all changes instead of staged changes only')
     parser.add_argument('--model', help='Manually specify OpenAI model to use (default: auto-selection)')
-    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-5-nano)')
+    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-4o-mini)')
     parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
     parser.add_argument('--prompt', help='Path to custom prompt template file')
     parser.add_argument('--no-categorize', action='store_true', help='Disable file categorization feature')
@@ -470,6 +600,8 @@ def main():
                         choices=['ko', 'ko-KR', 'en', 'en-US', 'en-GB', 'ja', 'ja-JP', 'zh', 'zh-CN', 'zh-TW'], 
                         default='ko',
                         help='Commit message language (ko/ko-KR: Korean, en/en-US/en-GB: English, ja/ja-JP: Japanese, zh/zh-CN: Chinese Simplified, zh-TW: Chinese Traditional)')
+    parser.add_argument('--auto-split', action='store_true', 
+                        help='Enable automatic commit splitting for complex changes')
     
     args = parser.parse_args()
     
@@ -496,25 +628,23 @@ def main():
         print("No changes found.")
         sys.exit(0)
     
-    # 모델 선택
+    # 모델 선택 및 복잡도 분석
+    complexity_score = 0  # 기본값
     if args.model:
         # 수동으로 모델 지정된 경우
         selected_model = args.model
         print(f"🎯 Manual selection: Using {selected_model} model")
     elif args.no_auto_model:
         # 자동 선택 비활성화
-        selected_model = "gpt-5-nano"
+        selected_model = "gpt-4o-mini"
         print(f"🔄 Default model: Using {selected_model}")
     else:
         # 자동 모델 선택 (기본값)
-        selected_model, score, details, reason = get_recommended_model(changed_files, diff)
+        selected_model, complexity_score, details, reason = get_recommended_model(changed_files, diff)
         reason_en = "Complex changes" if reason == "복잡한 변경사항" else "Simple changes"
-        print(f"🧠 Complexity analysis: {reason_en} (score: {score})")
+        print(f"🧠 Complexity analysis: {reason_en} (score: {complexity_score})")
         print(f"   • {', '.join(details)}")
         print(f"   → Selected {selected_model} model")
-    
-    # 커밋 메시지 생성
-    print("🤖 AI is generating commit message...")
     
     # 파일 분류 정보 출력 (여러 파일 변경 시)
     if len(changed_files) > 1 and not args.no_categorize:
@@ -527,8 +657,32 @@ def main():
             for category, files in change_summary['categories'].items():
                 print(f"  - {category.title()}: {', '.join(files)}")
     
+    # 복잡도에 따른 커밋 처리 분기
+    should_split = complexity_score >= 1 and args.auto_split and len(changed_files) >= 1
+    
+    if should_split and args.commit:
+        print("\n🤔 This is a complex change with multiple files.")
+        print("What would you like to do?")
+        print("1. Create a single commit")
+        print("2. Auto-split into multiple logical commits by category")
+        print("3. Cancel")
+        
+        choice = input("\nEnter your choice (1/2/3): ")
+        
+        if choice == '2':
+            # 자동 분할 커밋 진행
+            split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang)
+            return  # 분할 커밋 완료 후 종료
+        elif choice == '3':
+            print("\nCommit cancelled.")
+            return  # 취소 시 종료
+        # choice == '1'은 아래 코드 계속 실행하여 단일 커밋 진행
+    
+    # 단일 커밋 메시지 생성
+    print("🤖 AI is generating commit message...")
     result = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
-                                    enable_categorization=not args.no_categorize, lang=args.lang)
+                                   enable_categorization=not args.no_categorize, lang=args.lang, 
+                                   complexity_score=complexity_score)
     
     if result[0] is None:
         print("❌ Failed to generate commit message")
@@ -554,18 +708,27 @@ def main():
         else:
             print(f"   • Token usage info: {token_usage}")
     
-    # 자동 커밋 옵션이 활성화된 경우
-    if args.commit:
-        confirm = input("\nDo you want to commit with this message? (y/n): ")
-        if confirm.lower() == 'y':
-            make_commit(args.repo, commit_message)
-    else:
-        print("\nTo commit, run the following command:")
+    # 복잡한 변경사항 알림 (아직 처리되지 않은 경우)
+    if should_split and not args.commit:
+        print("\n🤔 This is a complex change with multiple files.")
+        print("Recommendation: Consider splitting these changes into multiple logical commits.")
+        print("To do this, run with '--commit --auto-split' flags.")
+        print("\nOr run the following command for a single commit:")
         print(f"git commit -m \"{commit_message}\"")
+    else:
+        # 일반적인 커밋 처리 (복잡도가 낮거나 자동 분할이 비활성화된 경우)
+        if args.commit:
+            confirm = input("\nDo you want to commit with this message? (y/n): ")
+            if confirm.lower() == 'y':
+                make_commit(args.repo, commit_message)
+        else:
+            print("\nTo commit, run the following command:")
+            print(f"git commit -m \"{commit_message}\"")
 
 def cli():
     """패키지의 명령줄 진입점"""
     main()
+
 
 if __name__ == "__main__":
     main()
