@@ -337,7 +337,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         lang (str, optional): 응답 언어 코드
     
     Returns:
-        str: 생성된 커밋 메시지
+        tuple: (생성된 커밋 메시지, 토큰 사용량 정보)
     """
     # API 키 확인
     # AI_COMMITER_API_KEY를 우선 확인하고, 없으면 OPENAI_API_KEY 확인
@@ -397,7 +397,7 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
         input_variables = ["diff", "total_files", "added_lines", "removed_lines", 
                           "categorized_files", "language_instruction"]
     
-    # LangChain 설정 (새로운 RunnableSequence 방식)
+    # LangChain 설정 (토큰 사용량 추적을 위해 callbacks 활용)
     llm = ChatOpenAI(temperature=0.5, model_name=openai_model)
     chain_prompt = PromptTemplate(input_variables=input_variables, template=prompt_template)
     chain = chain_prompt | llm
@@ -406,11 +406,25 @@ def generate_commit_message(diff, files, prompt_template=None, openai_model="gpt
     if len(prompt_vars["diff"]) > 4000:
         prompt_vars["diff"] = prompt_vars["diff"][:4000] + "\n... (truncated)"
     
-    # 커밋 메시지 생성
-    result = chain.invoke(prompt_vars)
-    # AIMessage 객체에서 content 속성 추출
-    commit_message = result.content if hasattr(result, 'content') else str(result)
-    return commit_message.strip()
+    # 커밋 메시지 생성 및 토큰 사용량 추적
+    try:
+        result = chain.invoke(prompt_vars)
+        # AIMessage 객체에서 content 속성 추출
+        commit_message = result.content if hasattr(result, 'content') else str(result)
+        
+        # 토큰 사용량 정보 추출 (response_metadata에서)
+        token_usage = None
+        if hasattr(result, 'response_metadata') and 'token_usage' in result.response_metadata:
+            token_usage = result.response_metadata['token_usage']
+        elif hasattr(result, 'usage_metadata'):
+            # 새로운 LangChain 버전의 경우
+            token_usage = result.usage_metadata
+        
+        return commit_message.strip(), token_usage
+        
+    except Exception as e:
+        print(f"Error generating commit message: {e}")
+        return None, None
 
 def make_commit(repo_path='.', message=None):
     """
@@ -506,13 +520,32 @@ def main():
             for category, files in change_summary['categories'].items():
                 print(f"  - {category.title()}: {', '.join(files)}")
     
-    commit_message = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
-                                           enable_categorization=not args.no_categorize, lang=args.lang)
+    result = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
+                                    enable_categorization=not args.no_categorize, lang=args.lang)
+    
+    if result[0] is None:
+        print("❌ Failed to generate commit message")
+        sys.exit(1)
+    
+    commit_message, token_usage = result
     
     print("\n📝 Generated commit message:")
     print("-" * 50)
     print(commit_message)
     print("-" * 50)
+    
+    # 토큰 사용량 출력
+    if token_usage:
+        print("\n📊 Token usage:")
+        if isinstance(token_usage, dict):
+            input_tokens = token_usage.get('prompt_tokens', 0)
+            output_tokens = token_usage.get('completion_tokens', 0)
+            total_tokens = token_usage.get('total_tokens', input_tokens + output_tokens)
+            print(f"   • Input tokens: {input_tokens:,}")
+            print(f"   • Output tokens: {output_tokens:,}")
+            print(f"   • Total tokens: {total_tokens:,}")
+        else:
+            print(f"   • Token usage info: {token_usage}")
     
     # 자동 커밋 옵션이 활성화된 경우
     if args.commit:
