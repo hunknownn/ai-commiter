@@ -10,7 +10,12 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import re
 from collections import defaultdict
+from pathlib import Path
 from ai_commiter import __version__
+from config import (
+    load_config, get_config_value, set_config_value, 
+    unset_config_value, list_config
+)
 
 # Language pack definitions with locale support
 LANGUAGE_PACKS = {
@@ -113,6 +118,7 @@ Output only the commit message:'''
 def get_language_instruction(lang):
     """Get language-specific response instruction."""
     return LANGUAGE_PACKS.get(lang, LANGUAGE_PACKS['ko'])['response_instruction']
+
 
 def get_git_diff(repo_path='.', staged=True, exclude_files=None):
     """
@@ -676,6 +682,19 @@ def main():
     commit_parser.add_argument('-e', '--exclude', action='append', metavar='FILE',
                         help='Exclude specific files from commit message generation (can be used multiple times)')
     
+    # config 서브커맨드 설정 (git config 스타일)
+    config_parser = subparsers.add_parser('config', help='Get and set repository or global options')
+    
+    # config 플래그들
+    config_parser.add_argument('-l', '--list', action='store_true', help='List all configuration settings')
+    config_parser.add_argument('--local', action='store_true', help='Use repository config file (default)')
+    config_parser.add_argument('--global', action='store_true', dest='global_config', help='Use global config file')
+    config_parser.add_argument('--unset', action='store_true', help='Remove a configuration setting')
+    
+    # config 인자들 (git config 스타일: key [value])
+    config_parser.add_argument('key', nargs='?', help='Configuration key (e.g., core.lang)')
+    config_parser.add_argument('value', nargs='?', help='Configuration value to set')
+    
     # 최상위 레벨에서는 서브커맨드만 허용
     
     args = parser.parse_args()
@@ -688,7 +707,56 @@ def main():
         sys.exit(1)
     
     # 서브커맨드에 따른 처리
-    if args.command == 'commit':
+    if args.command == 'config':
+        # config 명령어 처리 (git config 스타일)
+        use_global = getattr(args, 'global_config', False)
+        
+        if args.list:
+            # --list 또는 -l 플래그
+            list_config(use_global if use_global else None)
+        elif args.unset:
+            # --unset 플래그
+            if not args.key:
+                print("Error: --unset requires a key")
+                sys.exit(1)
+            if not unset_config_value(args.key, use_global):
+                sys.exit(1)
+        elif args.key and args.value:
+            # key value 형식: 설정
+            if not set_config_value(args.key, args.value, use_global):
+                sys.exit(1)
+        elif args.key:
+            # key만 있는 경우: 조회
+            value = get_config_value(args.key, use_global if use_global else None)
+            if value is not None:
+                print(value)
+            else:
+                print(f"Configuration key '{args.key}' not found")
+                sys.exit(1)
+        else:
+            # 인자가 없는 경우
+            print("Error: Missing configuration key or --list option")
+            config_parser.print_help()
+            sys.exit(1)
+    
+    elif args.command == 'commit':
+        # config 파일에서 기본값 로드 (글로벌 + 로컬 병합)
+        from config import load_merged_config
+        config = load_merged_config()
+        core_config = config.get('core', {})
+        
+        # 명령줄 인자가 없는 경우 config 값 사용
+        if not hasattr(args, 'lang') or args.lang == 'ko':  # 기본값인 경우
+            args.lang = core_config.get('lang', args.lang)
+        if not args.model:
+            args.model = core_config.get('model')
+        if not args.commit and core_config.get('commit') == 'true':
+            args.commit = True
+        if not args.split and core_config.get('split') == 'true':
+            args.split = True
+        if not args.prompt:
+            args.prompt = core_config.get('prompt')
+        
         # 커스텀 프롬프트 템플릿 로드
         custom_prompt = None
         if args.prompt:

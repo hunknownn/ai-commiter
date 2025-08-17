@@ -159,6 +159,72 @@ grit commit --lang ko --model gpt-4 --commit
 grit commit --all --lang en --split --exclude package-lock.json
 ```
 
+## ⚙️ Configuration Management
+
+You can save frequently used options as default settings using Git-style configuration:
+
+```bash
+# List all settings
+grit config --list
+grit config -l
+
+# Get specific setting
+grit config core.lang
+grit config core.model
+
+# Set configuration (key value format)
+grit config core.lang ko
+grit config core.model gpt-4
+grit config core.commit true
+grit config core.split false
+grit config core.prompt /path/to/custom-prompt.txt
+
+# Remove setting
+grit config --unset core.lang
+grit config --unset core.model
+
+# Global config (applies to all repositories)
+grit config --global core.lang en
+grit config --global core.model gpt-4
+grit config --global --list
+
+# Local repository config (default behavior, overrides global)
+grit config --local --list
+grit config --local core.lang ko
+```
+
+### Available Configuration Sections
+
+#### Core Section (`[core]`)
+| Key | Valid Values | Description |
+|-----|-------------|-------------|
+| `core.lang` | `ko`, `ko-KR`, `en`, `en-US`, `en-GB`, `ja`, `ja-JP`, `zh`, `zh-CN`, `zh-TW` | Default commit message language |
+| `core.model` | `gpt-4o-mini`, `gpt-4`, `gpt-3.5-turbo` | Default AI model |
+| `core.commit` | `true`, `false` | Automatically commit after generating message |
+| `core.split` | `true`, `false` | Automatically split complex changes |
+| `core.prompt` | File path | Path to custom prompt template |
+
+Configuration is stored in INI format:
+
+**Global config** (`~/.grit/config`):
+```ini
+[core]
+lang = en
+model = gpt-4
+commit = false
+```
+
+**Local config** (`./grit/config`):
+```ini
+[core]
+lang = ko
+commit = true
+split = false
+prompt = /path/to/custom-prompt.txt
+```
+
+로컬 설정이 글로벌 설정보다 우선순위를 가집니다.
+
 ## 🌍 Supported Languages
 
 | Language | Code | Example |
