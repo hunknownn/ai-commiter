@@ -472,7 +472,7 @@ def make_commit(repo_path='.', message=None):
         return False
 
 
-def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custom_prompt=None, model="gpt-4o-mini", lang='ko'):
+def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custom_prompt=None, model="gpt-4o-mini", lang='ko', user_specified_model=False):
     """
     변경사항을 카테고리별로 분할하여 순차적으로 커밋합니다.
     
@@ -554,9 +554,16 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
             # 현재 스테이지된 파일들의 diff 가져오기
             commit_diff = get_git_diff(repo_path, staged=True)
             
-            # 각 카테고리별 변경사항에 맞는 복잡도 계산 및 모델 선택
+            # 각 카테고리별 변경사항에 맞는 복잡도 계산
             category_complexity_score, score_details = calculate_complexity_score(commit_diff, files)
-            category_model, model_reason = select_model_by_complexity(category_complexity_score)
+            
+            # 사용자가 모델을 명시적으로 지정한 경우 해당 모델 사용, 아니면 자동 선택
+            if user_specified_model:  # 사용자가 모델을 명시적으로 지정했는지 확인
+                category_model = model
+                model_reason = "User specified model"
+            else:
+                # 자동 모델 선택
+                category_model, model_reason = select_model_by_complexity(category_complexity_score)
             
             # 커밋 메시지 생성
             print(f"COMMIT {idx+1}/{total_categories} - {category.title()} changes:")
@@ -625,8 +632,7 @@ def main():
     parser.add_argument('--repo', default='.', help='Git repository path (default: current directory)')
     parser.add_argument('--all', action='store_false', dest='staged', 
                         help='Include all changes instead of staged changes only')
-    parser.add_argument('--model', help='Manually specify OpenAI model to use (default: auto-selection)')
-    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-4o-mini)')
+    parser.add_argument('--model', help='Manually specify OpenAI model to use (applies to all commits in auto-split mode)')
     parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
     parser.add_argument('--prompt', help='Path to custom prompt template file')
     parser.add_argument('--lang', 
@@ -667,10 +673,6 @@ def main():
         # 수동으로 모델 지정된 경우
         selected_model = args.model
         print(f"🎯 Manual selection: Using {selected_model} model")
-    elif args.no_auto_model:
-        # 자동 선택 비활성화
-        selected_model = "gpt-4o-mini"
-        print(f"🔄 Default model: Using {selected_model}")
     else:
         # 자동 모델 선택 (기본값)
         complexity_score, score_details = calculate_complexity_score(diff, changed_files)
@@ -705,7 +707,9 @@ def main():
         
         if choice == '2':
             # 자동 분할 커밋 진행
-            split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang)
+            # 사용자가 모델을 명시적으로 지정했는지 확인
+            user_specified_model = args.model is not None
+            split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang, user_specified_model)
             return  # 분할 커밋 완료 후 종료
         elif choice == '3':
             print("\nCommit cancelled.")
