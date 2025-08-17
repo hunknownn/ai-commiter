@@ -150,11 +150,13 @@ grit commit --model gpt-3.5-turbo   # For simple changes (default)
 # Advanced options
 grit commit --all                   # Include unstaged changes
 grit commit --prompt custom.txt     # Use custom prompt template
-grit commit --split            # Auto-split complex changes
+grit commit --split                 # Auto-split complex changes
+grit commit --exclude package.json  # Exclude specific files from analysis
+grit commit -e file1.txt -e file2.py # Exclude multiple files
 
 # Combined examples
 grit commit --lang ko --model gpt-4 --commit
-grit commit --all --lang en --split
+grit commit --all --lang en --split --exclude package-lock.json
 ```
 
 ## 🌍 Supported Languages
@@ -221,30 +223,6 @@ You are an expert Git commit message generator. Create a commit message followin
 - Python 3.7+
 - Git
 - OpenAI API Key
-
-## 🆕 What's New
-
-### v1.0.0
-- **Git-style Subcommand Structure**: Implemented CLI format `grit commit --options` with Git-like subcommands
-- **Short Option Flags**: Added shorter flags (e.g., `-c` instead of `--commit`) for improved usability
-- **Option Renaming**: Simplified `--auto-split` to just `--split` (-s) for clarity
-- **Modern CLI Design**: Removed backward compatibility for a cleaner interface
-- **Streamlined Experience**: Proper error messages when subcommands are missing
-
-### v0.2.2
-- **Improved Model Selection**: Enhanced `--model` option to apply the specified model to all commits in auto-split mode
-- **Simplified CLI**: Removed `--no-auto-model` option for better user experience
-
-### v0.2.1
-- **Fixed Version Display**: Updated `__init__.py` version to properly show version in CLI commands
-- **Code Consistency**: Improved package structure and code consistency
-- **CLI Improvements**: Removed deprecated options from help message
-
-### v0.2.0
-- **Always Use Full Diff**: Removed complexity-based diff length limits for better commit message generation
-- **Always Enable File Categorization**: Removed `--no-categorize` option to always provide structured, categorized commits
-- **Improved Complexity Scoring**: Adjusted auto-split threshold from 1 to 5 for better user experience
-- **Enhanced Commit Splitting**: Improved handling of skipped commits with proper staging/unstaging
 
 ## 📄 License
 
