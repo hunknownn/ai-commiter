@@ -745,7 +745,7 @@ def main():
     
     elif args.command == 'commit':
         # config 파일에서 기본값 로드 (글로벌 + 로컬 병합)
-        from config import load_merged_config
+        from ai_commiter.config import load_merged_config
         config = load_merged_config()
         core_config = config.get('core', {})
         

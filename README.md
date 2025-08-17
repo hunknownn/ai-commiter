@@ -121,8 +121,8 @@ grit commit --commit
 # Use Korean language
 grit commit --lang ko --commit
 
-# Use GPT-4 for complex changes
-grit commit --model gpt-4 --commit
+# Use GPT-5-mini (recommended)
+grit commit --model gpt-5-mini --commit
 
 # Auto-split complex changes into multiple commits
 grit commit --commit --split
@@ -144,8 +144,11 @@ grit commit --lang zh-CN            # Chinese Simplified
 grit commit --lang zh-TW            # Chinese Traditional
 
 # Model selection
-grit commit --model gpt-4           # For complex changes
-grit commit --model gpt-3.5-turbo   # For simple changes (default)
+grit commit --model gpt-5-mini      # Recommended (default)
+grit commit --model gpt-4o          # Alternative option
+grit commit --model gpt-4           # Legacy option
+grit commit --model gpt-3.5-turbo   # For simple changes
+grit commit --model gpt-4o-mini     # ⚠️ May include markdown formatting in output
 
 # Advanced options
 grit commit --all                   # Include unstaged changes
@@ -155,7 +158,7 @@ grit commit --exclude package.json  # Exclude specific files from analysis
 grit commit -e file1.txt -e file2.py # Exclude multiple files
 
 # Combined examples
-grit commit --lang ko --model gpt-4 --commit
+grit commit --lang ko --model gpt-5-mini --commit  # Using recommended GPT-5-mini
 grit commit --all --lang en --split --exclude package-lock.json
 ```
 
@@ -199,7 +202,7 @@ grit config --local core.lang ko
 | Key | Valid Values | Description |
 |-----|-------------|-------------|
 | `core.lang` | `ko`, `ko-KR`, `en`, `en-US`, `en-GB`, `ja`, `ja-JP`, `zh`, `zh-CN`, `zh-TW` | Default commit message language |
-| `core.model` | `gpt-4o-mini`, `gpt-4`, `gpt-3.5-turbo` | Default AI model |
+| `core.model` | `gpt-5-mini` (recommended), `gpt-4o`, `gpt-4`, `gpt-3.5-turbo`, `gpt-4o-mini` | Default AI model (⚠️ gpt-4o-mini may include markdown formatting) |
 | `core.commit` | `true`, `false` | Automatically commit after generating message |
 | `core.split` | `true`, `false` | Automatically split complex changes |
 | `core.prompt` | File path | Path to custom prompt template |
@@ -210,7 +213,7 @@ Configuration is stored in INI format:
 ```ini
 [core]
 lang = en
-model = gpt-4
+model = gpt-5-mini  # Recommended default
 commit = false
 ```
 
@@ -289,6 +292,28 @@ You are an expert Git commit message generator. Create a commit message followin
 - Python 3.7+
 - Git
 - OpenAI API Key
+
+## 🔧 Troubleshooting
+
+### GPT-4o-mini 모델 사용 시 출력 형식 문제
+
+**문제**: GPT-4o-mini 모델 사용 시 커밋 메시지에 코드 블록 마크다운(```` ``` ````)이 포함되어 출력될 수 있습니다.
+
+**해결 방법**:
+```bash
+# GPT-5-mini 사용 (권장)
+grit commit --model gpt-5-mini
+
+# 또는 기본 모델을 GPT-5-mini로 변경
+grit config core.model gpt-5-mini
+
+# 대안: GPT-4o, GPT-4 또는 GPT-3.5-turbo 사용
+grit commit --model gpt-4o
+grit commit --model gpt-4
+grit commit --model gpt-3.5-turbo
+```
+
+**참고**: 이는 GPT-4o-mini 모델의 특성으로, 향후 업데이트에서 개선될 예정입니다.
 
 ## 📄 License
 
