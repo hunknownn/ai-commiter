@@ -621,7 +621,7 @@ def main():
     
     # 최상위 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI-powered Git commit message generator with multi-language support')
-    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
+    parser.add_argument('-v', '--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
     
     # 서브커맨드 설정
     subparsers = parser.add_subparsers(dest='command', help='Available commands')

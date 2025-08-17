@@ -106,7 +106,7 @@ pip3 install --upgrade ai-commiter
 pip install --upgrade ai-commiter
 
 # Check version
-grit --version
+grit --version  # 또는 grit -v
 ```
 
 ## 🚀 Quick Start
@@ -224,10 +224,12 @@ You are an expert Git commit message generator. Create a commit message followin
 
 ## 🆕 What's New
 
-### v0.2.3
-- **Git-style Subcommand Structure**: Changed CLI format from `grit --options` to `grit commit --options` for better usability and extensibility
-- **Improved Command Organization**: Now supports proper subcommands for future feature expansion
-- **Backward Compatibility**: Maintains compatibility with previous usage patterns
+### v1.0.0
+- **Git-style Subcommand Structure**: Implemented CLI format `grit commit --options` with Git-like subcommands
+- **Short Option Flags**: Added shorter flags (e.g., `-c` instead of `--commit`) for improved usability
+- **Option Renaming**: Simplified `--auto-split` to just `--split` (-s) for clarity
+- **Modern CLI Design**: Removed backward compatibility for a cleaner interface
+- **Streamlined Experience**: Proper error messages when subcommands are missing
 
 ### v0.2.2
 - **Improved Model Selection**: Enhanced `--model` option to apply the specified model to all commits in auto-split mode
