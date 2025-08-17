@@ -82,6 +82,7 @@ The commit message consists of header and body:
 - Examples: "Add multi-language support", "Remove redundant validation", "Fix null pointer exception"
 
 2. body  
+- MANDATORY: Leave ONE EMPTY LINE between header and body
 - Explain WHAT was changed and WHY (within 72 characters per line)
 - Keep it CONCISE and focused (maximum 3-4 lines)
 - Group related changes into single points, avoid listing every detail
@@ -90,6 +91,8 @@ The commit message consists of header and body:
 - MANDATORY: Put each sentence on a separate line
 - MANDATORY: Do NOT end sentences with periods (.)
 - Example format:
+  feat: Add multi-language support
+  
   - Main change or feature that was implemented
   - Key reason or benefit for this change
   - Important technical detail (if needed)
