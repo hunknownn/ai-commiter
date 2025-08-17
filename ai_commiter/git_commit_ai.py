@@ -114,13 +114,14 @@ def get_language_instruction(lang):
     """Get language-specific response instruction."""
     return LANGUAGE_PACKS.get(lang, LANGUAGE_PACKS['ko'])['response_instruction']
 
-def get_git_diff(repo_path='.', staged=True):
+def get_git_diff(repo_path='.', staged=True, exclude_files=None):
     """
     Git 저장소에서 변경 내용을 가져옵니다.
     
     Args:
         repo_path (str): Git 저장소 경로
         staged (bool): 스테이지된 변경사항만 포함할지 여부
+        exclude_files (list): 제외할 파일 목록
     
     Returns:
         str: Git diff 출력
@@ -134,6 +135,27 @@ def get_git_diff(repo_path='.', staged=True):
             # 모든 변경사항
             diff = repo.git.diff()
         
+        # 제외할 파일이 있는 경우 필터링
+        if exclude_files:
+            diff_lines = diff.split('\n')
+            filtered_lines = []
+            skip_file = False
+            
+            for line in diff_lines:
+                # diff 파일 헤더 확인
+                if line.startswith('diff --git'):
+                    # 파일 경로 추출 (a/path/to/file b/path/to/file 형태)
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        file_path = parts[2][2:]  # a/ 제거
+                        skip_file = any(file_path == exclude_file or file_path.endswith('/' + exclude_file) 
+                                      for exclude_file in exclude_files)
+                
+                if not skip_file:
+                    filtered_lines.append(line)
+            
+            diff = '\n'.join(filtered_lines)
+        
         return diff
     except git.exc.InvalidGitRepositoryError:
         print(f"Error: '{repo_path}' is not a valid Git repository.")
@@ -142,13 +164,14 @@ def get_git_diff(repo_path='.', staged=True):
         print(f"Git diff error: {str(e)}")
         return diff
 
-def get_changed_files(repo_path='.', staged=True):
+def get_changed_files(repo_path='.', staged=True, exclude_files=None):
     """
     변경된 파일 목록을 가져옵니다.
     
     Args:
         repo_path (str): Git 저장소 경로
         staged (bool): True면 스테이지된 변경사항, False면 모든 변경사항
+        exclude_files (list): 제외할 파일 목록
     
     Returns:
         list: 변경된 파일 목록
@@ -163,7 +186,16 @@ def get_changed_files(repo_path='.', staged=True):
             # 모든 변경사항 가져오기
             changed_files = repo.git.diff('--name-only').split('\n')
         
-        return [f for f in changed_files if f]
+        # 빈 문자열 제거
+        changed_files = [f for f in changed_files if f]
+        
+        # 제외할 파일이 있는 경우 필터링
+        if exclude_files:
+            changed_files = [f for f in changed_files 
+                           if not any(f == exclude_file or f.endswith('/' + exclude_file) 
+                                    for exclude_file in exclude_files)]
+        
+        return changed_files
     except git.exc.InvalidGitRepositoryError:
         print(f"Error: '{repo_path}' is not a valid Git repository.")
         sys.exit(1)
@@ -472,7 +504,7 @@ def make_commit(repo_path='.', message=None):
         return False
 
 
-def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custom_prompt=None, model="gpt-4o-mini", lang='ko'):
+def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custom_prompt=None, model="gpt-4o-mini", lang='ko', exclude_files=None):
     """
     변경사항을 카테고리별로 분할하여 순차적으로 커밋합니다.
     
@@ -483,6 +515,7 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
         custom_prompt (str, optional): 커스텀 프롬프트 템플릿
         model (str): 사용할 OpenAI 모델
         lang (str): 커밋 메시지 언어
+        exclude_files (list): 제외할 파일 목록
     
     Returns:
         bool: 모든 커밋 성공 여부
@@ -516,7 +549,7 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
             for file in staged_files:
                 repo.git.add(file)
             
-            commit_diff = get_git_diff(repo_path, staged=True)
+            commit_diff = get_git_diff(repo_path, staged=True, exclude_files=exclude_files)
             result = generate_commit_message(commit_diff, staged_files, custom_prompt, model, 
                                          enable_categorization=True, lang=lang)
             
@@ -552,7 +585,7 @@ def split_and_commit_changes(repo_path='.', changed_files=None, diff=None, custo
                 repo.git.add('-A', file)
             
             # 현재 스테이지된 파일들의 diff 가져오기
-            commit_diff = get_git_diff(repo_path, staged=True)
+            commit_diff = get_git_diff(repo_path, staged=True, exclude_files=exclude_files)
             
             # 각 카테고리별 변경사항에 맞는 복잡도 계산 및 모델 선택
             category_complexity_score, score_details = calculate_complexity_score(commit_diff, files)
@@ -621,7 +654,7 @@ def main():
     
     # 최상위 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI-powered Git commit message generator with multi-language support')
-    parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
+    parser.add_argument('-v', '--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
     
     # 서브커맨드 설정
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -640,6 +673,8 @@ def main():
                         help='Commit message language (ko/ko-KR: Korean, en/en-US/en-GB: English, ja/ja-JP: Japanese, zh/zh-CN: Chinese Simplified, zh-TW: Chinese Traditional)')
     commit_parser.add_argument('-s', '--split', action='store_true', 
                         help='Enable automatic commit splitting for complex changes')
+    commit_parser.add_argument('-e', '--exclude', action='append', metavar='FILE',
+                        help='Exclude specific files from commit message generation (can be used multiple times)')
     
     # 최상위 레벨에서는 서브커맨드만 허용
     
@@ -666,8 +701,8 @@ def main():
         
         # Git diff 가져오기
         try:
-            diff = get_git_diff(args.repo, staged=args.staged)
-            changed_files = get_changed_files(args.repo, staged=args.staged)
+            diff = get_git_diff(args.repo, staged=args.staged, exclude_files=args.exclude)
+            changed_files = get_changed_files(args.repo, staged=args.staged, exclude_files=args.exclude)
         except Exception as e:
             print(f"Git diff error: {str(e)}")
             sys.exit(1)
@@ -718,7 +753,7 @@ def main():
             if choice == '2':
                 # 자동 분할 커밋 진행
                 user_specified_model = args.model is not None
-                split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang, user_specified_model)
+                split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang, args.exclude)
                 return  # 분할 커밋 완료 후 종료
             elif choice == '3':
                 print("\nCommit cancelled.")
