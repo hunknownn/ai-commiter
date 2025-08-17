@@ -88,6 +88,7 @@ The commit message consists of header and body:
 - Focus on the main purpose and impact, not individual file changes
 - MANDATORY: Start each line with a dash (-)
 - MANDATORY: Put each sentence on a separate line
+- MANDATORY: Do NOT end sentences with periods (.)
 - Example format:
   - Main change or feature that was implemented
   - Key reason or benefit for this change
