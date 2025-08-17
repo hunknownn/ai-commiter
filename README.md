@@ -220,6 +220,10 @@ You are an expert Git commit message generator. Create a commit message followin
 
 ## 🆕 What's New
 
+### v0.2.2
+- **Improved Model Selection**: Enhanced `--model` option to apply the specified model to all commits in auto-split mode
+- **Simplified CLI**: Removed `--no-auto-model` option for better user experience
+
 ### v0.2.1
 - **Fixed Version Display**: Updated `__init__.py` version to properly show version in CLI commands
 - **Code Consistency**: Improved package structure and code consistency
