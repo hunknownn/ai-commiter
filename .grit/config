@@ -1,3 +1,4 @@
 [core]
 commit = true
+split = true
 

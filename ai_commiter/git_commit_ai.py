@@ -12,7 +12,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 from ai_commiter import __version__
-from config import (
+from ai_commiter.config import (
     load_config, get_config_value, set_config_value, 
     unset_config_value, list_config
 )
