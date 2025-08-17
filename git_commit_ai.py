@@ -619,145 +619,163 @@ def main():
     # .env 파일 로드
     load_dotenv()
     
-    # 명령줄 인자 파싱
+    # 최상위 명령줄 인자 파싱
     parser = argparse.ArgumentParser(description='AI-powered Git commit message generator with multi-language support')
     parser.add_argument('--version', action='version', version=f'ai-commiter {__version__}', help='Show version information')
-    parser.add_argument('--repo', default='.', help='Git repository path (default: current directory)')
-    parser.add_argument('--all', action='store_false', dest='staged', 
+    
+    # 서브커맨드 설정
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # commit 서브커맨드 설정
+    commit_parser = subparsers.add_parser('commit', help='Generate AI commit message')
+    commit_parser.add_argument('-r', '--repo', default='.', help='Git repository path (default: current directory)')
+    commit_parser.add_argument('-a', '--all', action='store_false', dest='staged', 
                         help='Include all changes instead of staged changes only')
-    parser.add_argument('--model', help='Manually specify OpenAI model to use (default: auto-selection)')
-    parser.add_argument('--no-auto-model', action='store_true', help='Disable automatic model selection (use default gpt-4o-mini)')
-    parser.add_argument('--commit', action='store_true', help='Automatically perform commit with generated message')
-    parser.add_argument('--prompt', help='Path to custom prompt template file')
-    parser.add_argument('--lang', 
+    commit_parser.add_argument('-m', '--model', help='Manually specify OpenAI model to use (applies to all commits in auto-split mode)')
+    commit_parser.add_argument('-c', '--commit', action='store_true', help='Automatically perform commit with generated message')
+    commit_parser.add_argument('-p', '--prompt', help='Path to custom prompt template file')
+    commit_parser.add_argument('-l', '--lang', 
                         choices=['ko', 'ko-KR', 'en', 'en-US', 'en-GB', 'ja', 'ja-JP', 'zh', 'zh-CN', 'zh-TW'], 
                         default='ko',
                         help='Commit message language (ko/ko-KR: Korean, en/en-US/en-GB: English, ja/ja-JP: Japanese, zh/zh-CN: Chinese Simplified, zh-TW: Chinese Traditional)')
-    parser.add_argument('--auto-split', action='store_true', 
+    commit_parser.add_argument('-s', '--split', action='store_true', 
                         help='Enable automatic commit splitting for complex changes')
+    
+    # 최상위 레벨에서는 서브커맨드만 허용
     
     args = parser.parse_args()
     
-    # 커스텀 프롬프트 템플릿 로드
-    custom_prompt = None
-    if args.prompt:
+    # 서브커맨드가 없는 경우 처리
+    if args.command is None:
+        print("Error: Missing required subcommand. See usage below.")
+        print("\nFor commit message generation, use: grit commit [options]")
+        parser.print_help()
+        sys.exit(1)
+    
+    # 서브커맨드에 따른 처리
+    if args.command == 'commit':
+        # 커스텀 프롬프트 템플릿 로드
+        custom_prompt = None
+        if args.prompt:
+            try:
+                with open(args.prompt, 'r', encoding='utf-8') as f:
+                    custom_prompt = f.read()
+            except Exception as e:
+                print(f"Prompt file load error: {str(e)}")
+                sys.exit(1)
+        
+        # Git diff 가져오기
         try:
-            with open(args.prompt, 'r', encoding='utf-8') as f:
-                custom_prompt = f.read()
+            diff = get_git_diff(args.repo, staged=args.staged)
+            changed_files = get_changed_files(args.repo, staged=args.staged)
         except Exception as e:
-            print(f"Prompt file load error: {str(e)}")
+            print(f"Git diff error: {str(e)}")
             sys.exit(1)
-    
-    # Git diff 가져오기
-    try:
-        diff = get_git_diff(args.repo, staged=args.staged)
-        changed_files = get_changed_files(args.repo, staged=args.staged)
-    except Exception as e:
-        print(f"Git diff error: {str(e)}")
-        sys.exit(1)
-    
-    # 변경사항이 없는 경우
-    if not diff.strip():
-        print("No changes found.")
-        sys.exit(0)
-    
-    # 모델 선택 및 복잡도 분석
-    complexity_score = 0  # 기본값
-    if args.model:
-        # 수동으로 모델 지정된 경우
-        selected_model = args.model
-        print(f"🎯 Manual selection: Using {selected_model} model")
-    elif args.no_auto_model:
-        # 자동 선택 비활성화
-        selected_model = "gpt-4o-mini"
-        print(f"🔄 Default model: Using {selected_model}")
-    else:
-        # 자동 모델 선택 (기본값)
-        complexity_score, score_details = calculate_complexity_score(diff, changed_files)
-        selected_model, model_reason = select_model_by_complexity(complexity_score)
-        reason_en = "Complex changes" if "복잡한" in model_reason else "Simple changes"
-        print(f"🧠 Complexity analysis: {reason_en} (score: {complexity_score})")
-        print(f"   • {', '.join(score_details)}")
-        print(f"   → Selected {selected_model} model")
-    
-    # 파일 분류 정보 출력 (여러 파일 변경 시)
-    if len(changed_files) > 1:
-        change_summary = categorize_file_changes(changed_files, diff)
-        print(f"\n📊 Change statistics: {change_summary['stats']['total_files']} files, "
-              f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} lines")
         
-        if change_summary['categories']:
-            print("📁 Changes by category:")
-            for category, files in change_summary['categories'].items():
-                print(f"  - {category.title()}: {', '.join(files)}")
+        # 변경사항이 없는 경우
+        if not diff.strip():
+            print("No changes found.")
+            sys.exit(0)
     
-    # 복잡도에 따른 커밋 처리 분기
-    should_split = complexity_score >= 5 and args.auto_split and len(changed_files) >= 1
-    
-    if should_split and args.commit:
-        print("\n🤔 This is a complex change with multiple files.")
-        print("What would you like to do?")
-        print("1. Create a single commit")
-        print("2. Auto-split into multiple logical commits by category")
-        print("3. Cancel")
-        
-        choice = input("\nEnter your choice (1/2/3): ")
-        
-        if choice == '2':
-            # 자동 분할 커밋 진행
-            split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang)
-            return  # 분할 커밋 완료 후 종료
-        elif choice == '3':
-            print("\nCommit cancelled.")
-            return  # 취소 시 종료
-        # choice == '1'은 아래 코드 계속 실행하여 단일 커밋 진행
-    
-    # 단일 커밋 메시지 생성
-    print("🤖 AI is generating commit message...")
-    result = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
-                                   enable_categorization=True, lang=args.lang, 
-                                   complexity_score=complexity_score)
-    
-    if result[0] is None:
-        print("❌ Failed to generate commit message")
-        sys.exit(1)
-    
-    commit_message, token_usage = result
-    
-    print("\n📝 Generated commit message:")
-    print("-" * 50)
-    print(commit_message)
-    print("-" * 50)
-    
-    # 토큰 사용량 출력
-    if token_usage:
-        print("\n📊 Token usage:")
-        if isinstance(token_usage, dict):
-            input_tokens = token_usage.get('prompt_tokens', 0)
-            output_tokens = token_usage.get('completion_tokens', 0)
-            total_tokens = token_usage.get('total_tokens', input_tokens + output_tokens)
-            print(f"   • Input tokens: {input_tokens:,}")
-            print(f"   • Output tokens: {output_tokens:,}")
-            print(f"   • Total tokens: {total_tokens:,}")
+        # 모델 선택 및 복잡도 분석
+        complexity_score = 0  # 기본값
+        if args.model:
+            # 수동으로 모델 지정된 경우
+            selected_model = args.model
+            print(f"🎯 Manual selection: Using {selected_model} model")
         else:
-            print(f"   • Token usage info: {token_usage}")
-    
-    # 복잡한 변경사항 알림 (아직 처리되지 않은 경우)
-    if should_split and not args.commit:
-        print("\n🤔 This is a complex change with multiple files.")
-        print("Recommendation: Consider splitting these changes into multiple logical commits.")
-        print("To do this, run with '--commit --auto-split' flags.")
-        print("\nOr run the following command for a single commit:")
-        print(f"git commit -m \"{commit_message}\"")
-    else:
-        # 일반적인 커밋 처리 (복잡도가 낮거나 자동 분할이 비활성화된 경우)
-        if args.commit:
-            confirm = input("\nDo you want to commit with this message? (y/n): ")
-            if confirm.lower() == 'y':
-                make_commit(args.repo, commit_message)
-        else:
-            print("\nTo commit, run the following command:")
+            # 자동 모델 선택 (기본값)
+            complexity_score, score_details = calculate_complexity_score(diff, changed_files)
+            selected_model, model_reason = select_model_by_complexity(complexity_score)
+            reason_en = "Complex changes" if "복잡한" in model_reason else "Simple changes"
+            print(f"🧠 Complexity analysis: {reason_en} (score: {complexity_score})")
+            print(f"   • {', '.join(score_details)}")
+            print(f"   → Selected {selected_model} model")
+        
+        # 파일 분류 정보 출력 (여러 파일 변경 시)
+        if len(changed_files) > 1:
+            change_summary = categorize_file_changes(changed_files, diff)
+            print(f"\n📊 Change statistics: {change_summary['stats']['total_files']} files, "
+                  f"+{change_summary['stats']['added_lines']}/-{change_summary['stats']['removed_lines']} lines")
+            
+            if change_summary['categories']:
+                print("📁 Changes by category:")
+                for category, files in change_summary['categories'].items():
+                    print(f"  - {category.title()}: {', '.join(files)}")
+        
+        # 복잡도에 따른 커밋 처리 분기
+        should_split = complexity_score >= 5 and args.split and len(changed_files) >= 1
+        
+        if should_split and args.commit:
+            print("\n🤔 This is a complex change with multiple files.")
+            print("What would you like to do?")
+            print("1. Create a single commit")
+            print("2. Auto-split into multiple logical commits by category")
+            print("3. Cancel")
+            
+            choice = input("\nEnter your choice (1/2/3): ")
+            
+            if choice == '2':
+                # 자동 분할 커밋 진행
+                user_specified_model = args.model is not None
+                split_and_commit_changes(args.repo, changed_files, diff, custom_prompt, selected_model, args.lang, user_specified_model)
+                return  # 분할 커밋 완료 후 종료
+            elif choice == '3':
+                print("\nCommit cancelled.")
+                return  # 취소 시 종료
+            # choice == '1'은 아래 코드 계속 실행하여 단일 커밋 진행
+        
+        # 단일 커밋 메시지 생성
+        print("🤖 AI is generating commit message...")
+        result = generate_commit_message(diff, changed_files, custom_prompt, selected_model, 
+                                       enable_categorization=True, lang=args.lang, 
+                                       complexity_score=complexity_score)
+        
+        if result[0] is None:
+            print("❌ Failed to generate commit message")
+            sys.exit(1)
+        
+        commit_message, token_usage = result
+        
+        print("\n📝 Generated commit message:")
+        print("-" * 50)
+        print(commit_message)
+        print("-" * 50)
+        
+        # 토큰 사용량 출력
+        if token_usage:
+            print("\n📊 Token usage:")
+            if isinstance(token_usage, dict):
+                input_tokens = token_usage.get('prompt_tokens', 0)
+                output_tokens = token_usage.get('completion_tokens', 0)
+                total_tokens = token_usage.get('total_tokens', input_tokens + output_tokens)
+                print(f"   • Input tokens: {input_tokens:,}")
+                print(f"   • Output tokens: {output_tokens:,}")
+                print(f"   • Total tokens: {total_tokens:,}")
+            else:
+                print(f"   • Token usage info: {token_usage}")
+        
+        # 복잡한 변경사항 알림 (아직 처리되지 않은 경우)
+        if should_split and not args.commit:
+            print("\n🤔 This is a complex change with multiple files.")
+            print("Recommendation: Consider splitting these changes into multiple logical commits.")
+            print("To do this, run with 'grit commit --commit --auto-split' flags.")
+            print("\nOr run the following command for a single commit:")
             print(f"git commit -m \"{commit_message}\"")
+        else:
+            # 일반적인 커밋 처리 (복잡도가 낮거나 자동 분할이 비활성화된 경우)
+            if args.commit:
+                confirm = input("\nDo you want to commit with this message? (y/n): ")
+                if confirm.lower() == 'y':
+                    make_commit(args.repo, commit_message)
+            else:
+                print("\nTo commit, run the following command:")
+                print(f"git commit -m \"{commit_message}\"")
+    else:
+        # 알 수 없는 서브커맨드
+        print(f"Unknown command: {args.command}")
+        parser.print_help()
+        sys.exit(1)
 
 def cli():
     """패키지의 명령줄 진입점"""

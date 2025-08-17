@@ -113,55 +113,59 @@ grit --version
 
 ```bash
 # Generate commit message (preview)
-grit
+grit commit
 
 # Generate and commit automatically
-grit --commit
+grit commit --commit
 
 # Use Korean language
-grit --lang ko --commit
+grit commit --lang ko --commit
 
 # Use GPT-4 for complex changes
-grit --model gpt-4 --commit
+grit commit --model gpt-4 --commit
+
+# Auto-split complex changes into multiple commits
+grit commit --commit --split
 ```
 
 ## 📝 Usage Examples
 
 ```bash
 # Basic usage
-grit                         # Preview commit message
-grit --commit                # Generate and commit
-grit --repo /path/to/repo    # Specify repository path
+grit commit                         # Preview commit message
+grit commit --commit                # Generate and commit
+grit commit --repo /path/to/repo    # Specify repository path
 
 # Language options
-grit --lang ko               # Korean
-grit --lang en               # English (default)
-grit --lang ja               # Japanese
-grit --lang zh-CN            # Chinese Simplified
-grit --lang zh-TW            # Chinese Traditional
+grit commit --lang ko               # Korean
+grit commit --lang en               # English (default)
+grit commit --lang ja               # Japanese
+grit commit --lang zh-CN            # Chinese Simplified
+grit commit --lang zh-TW            # Chinese Traditional
 
 # Model selection
-grit --model gpt-4           # For complex changes
-grit --model gpt-3.5-turbo   # For simple changes (default)
+grit commit --model gpt-4           # For complex changes
+grit commit --model gpt-3.5-turbo   # For simple changes (default)
 
 # Advanced options
-grit --all                   # Include unstaged changes
-grit --prompt custom.txt     # Use custom prompt template
+grit commit --all                   # Include unstaged changes
+grit commit --prompt custom.txt     # Use custom prompt template
+grit commit --split            # Auto-split complex changes
 
 # Combined examples
-grit --lang ko --model gpt-4 --commit
-grit --all --lang en
+grit commit --lang ko --model gpt-4 --commit
+grit commit --all --lang en --split
 ```
 
 ## 🌍 Supported Languages
 
 | Language | Code | Example |
 |----------|------|--------|
-| Korean | `ko`, `ko-KR` | `grit --lang ko` |
-| English | `en`, `en-US`, `en-GB` | `grit --lang en` |
-| Japanese | `ja`, `ja-JP` | `grit --lang ja` |
-| Chinese (Simplified) | `zh`, `zh-CN` | `grit --lang zh-CN` |
-| Chinese (Traditional) | `zh-TW` | `grit --lang zh-TW` |
+| Korean | `ko`, `ko-KR` | `grit commit --lang ko` |
+| English | `en`, `en-US`, `en-GB` | `grit commit --lang en` |
+| Japanese | `ja`, `ja-JP` | `grit commit --lang ja` |
+| Chinese (Simplified) | `zh`, `zh-CN` | `grit commit --lang zh-CN` |
+| Chinese (Traditional) | `zh-TW` | `grit commit --lang zh-TW` |
 
 > **Note**: Commit titles are always in English (imperative mood) following Conventional Commits standard. Only the detailed descriptions are localized.
 
@@ -219,6 +223,11 @@ You are an expert Git commit message generator. Create a commit message followin
 - OpenAI API Key
 
 ## 🆕 What's New
+
+### v0.2.3
+- **Git-style Subcommand Structure**: Changed CLI format from `grit --options` to `grit commit --options` for better usability and extensibility
+- **Improved Command Organization**: Now supports proper subcommands for future feature expansion
+- **Backward Compatibility**: Maintains compatibility with previous usage patterns
 
 ### v0.2.2
 - **Improved Model Selection**: Enhanced `--model` option to apply the specified model to all commits in auto-split mode
