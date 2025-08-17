@@ -886,7 +886,15 @@ def main():
 
 def cli():
     """패키지의 명령줄 진입점"""
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n⚠️  Operation cancelled by user.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ An error occurred: {str(e)}")
+        print("💡 If the problem persists, please report it on GitHub Issues: https://github.com/hunknownn/ai-commiter/issues")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
